@@ -69,6 +69,9 @@
   #checker{position:absolute; inset:0; z-index:0; background:repeating-conic-gradient(#3a3a42 0% 25%, #26262c 0% 50%); background-size:16px 16px;}
   #onionLayer{position:absolute; inset:0; z-index:1; pointer-events:none; image-rendering:pixelated;}
   #gridlines{position:absolute; inset:0; z-index:2; pointer-events:none;}
+  #selectLayer{position:absolute; inset:0; z-index:4; pointer-events:none; display:none;}
+  #selectLayer .marquee{position:absolute; border:2px dashed var(--accent2); box-shadow:0 0 0 1px rgba(0,0,0,.6) inset, 0 0 0 9999px rgba(0,0,0,.25);}
+  #selectLayer .ghost{position:absolute; image-rendering:pixelated; image-rendering:crisp-edges; opacity:.75; border:1px solid var(--accent);}
   #frameBar{display:flex; align-items:center; gap:6px; padding:8px 12px; background:var(--panel); border-top:3px solid var(--line); flex-shrink:0;}
   #frameStrip .frame-thumb{width:52px; height:52px; border:2px solid var(--line); background:#141417; display:flex; align-items:center; justify-content:center; cursor:pointer; position:relative; flex-shrink:0; border-radius:2px; padding:2px;}
   #frameStrip .frame-thumb canvas{max-width:100%; max-height:100%; image-rendering:pixelated;}
@@ -138,6 +141,9 @@
         <button class="px-btn" data-tool="fill"><span>🪣</span>填充</button>
         <button class="px-btn" data-tool="picker"><span>💉</span>取色</button>
         <button class="px-btn" data-tool="line"><span>📏</span>直线</button>
+        <button class="px-btn" data-tool="select"><span>✂️</span>选区</button>
+        <button class="px-btn" data-tool="rect"><span>🔲</span>矩形</button>
+        <button class="px-btn" data-tool="ellipse"><span>⭕</span>椭圆</button>
       </div>
     </div>
     <div class="side-group">
@@ -157,6 +163,22 @@
         </select>
       </div>
       <label class="switch"><input type="checkbox" id="gridToggle" checked><span class="knob"></span>网格</label>
+    </div>
+    <div class="side-group" id="shapeGroup" style="display:none">
+      <div class="side-title">🔲/⭕ 形状模式</div>
+      <label class="switch"><input type="checkbox" id="shapeFill"><span class="knob"></span>实心填充</label>
+    </div>
+    <div class="side-group" id="selectGroup" style="display:none">
+      <div class="side-title">✂️ 选区操作</div>
+      <div class="row" style="flex-wrap:wrap">
+        <button class="px-btn" id="btnSelFlipH" title="水平翻转选中内容">↔️ 水平翻转</button>
+        <button class="px-btn" id="btnSelFlipV" title="垂直翻转选中内容">↕️ 垂直翻转</button>
+        <button class="px-btn" id="btnSelRotate" title="旋转 90°">🔄 旋转90°</button>
+        <button class="px-btn" id="btnSelCopy" title="复制选区 (Ctrl+C)">📋 复制</button>
+        <button class="px-btn" id="btnSelPaste" title="粘贴 (Ctrl+V)">📌 粘贴</button>
+        <button class="px-btn" id="btnSelClear" title="取消选区 (Esc)" style="color:var(--danger)">✕ 取消</button>
+      </div>
+      <div class="mini-label" style="margin-top:8px">提示：框选后可直接拖动移动；Ctrl+C 复制 / Ctrl+V 粘贴</div>
     </div>
     <div class="side-group">
       <div class="side-title">🎞️ 动画</div>
@@ -188,6 +210,7 @@
         <div id="onionLayer"></div>
         <div id="gridlines"></div>
         <canvas id="gridCanvas"></canvas>
+        <div id="selectLayer"></div>
       </div>
     </div>
     <!-- 帧栏 -->
@@ -274,7 +297,15 @@
       <p>打开「洋葱皮」可看到<b>前后帧半透明叠影</b>，照着上一帧位置画下一帧，动画更连贯（透明度可调）。</p>
       <h3>8️⃣ 对称绘制（Phase 2）</h3>
       <p>左栏「对称」开<b>水平镜像</b>，画一笔左右同时出现 —— 画脸、画翅膀神器；<b>四向镜像</b>一下出四个方向。</p>
-      <h3>9️⃣ 自动保存</h3>
+      <h3>🔟 选区工具（Phase 3）</h3>
+      <p>左栏选 <b>✂️ 选区</b>，在画布上<b>拖动框选</b>一个方块；框选后可在框内<b>按住拖动移动</b>整块内容（原位变透明），或点按钮<b>水平翻转 / 垂直翻转 / 旋转 90°</b>。</p>
+      <ul>
+        <li><span class="shortcut">Ctrl+C 复制</span> → <span class="shortcut">Ctrl+V 粘贴</span>，粘贴的是<b>浮动层</b>，鼠标点哪就贴哪</li>
+        <li><span class="shortcut">Esc</span> 取消选区</li>
+      </ul>
+      <h3>1️⃣1️⃣ 形状工具（Phase 3）</h3>
+      <p>左栏 <b>⬜ 矩形</b> 或 <b>⬭ 椭圆</b>：点起点拖到终点松开。默认<b>空心</b>边框，勾选「实心」变填充块。</p>
+      <h3>1️⃣2️⃣ 自动保存</h3>
       <p>内容会<span class="shortcut">自动保存</span>到浏览器本地，关掉页面再打开，上次画的还在，不怕丢。</p>
     </div>
     <div class="modal-foot"><button class="px-btn primary" id="btnCloseTutorial2">开始画画 🚀</button></div>
@@ -1200,10 +1231,20 @@ let state = {
   playing: false,
   // Phase 2 对称
   symmetry: "none",     // none | h | v | hv
+  // Phase 3 选区 + 形状
+  selRect: null,        // {x0,y0,x1,y1} 归一化（x0<=x1）
+  selClip: null,        // 剪贴板 {w,h,data:Uint8ClampedArray, offX, offY}
+  clipMode: false,      // 粘贴浮动模式：显示 ghost 等待放置
+  clipGhostX: 0, clipGhostY: 0,
+  shapeFill: false,     // 形状实心/空心
 };
 let canvas, ctx, cell = 10;
 let drawing = false, lastX = -1, lastY = -1, lineStart = null, startPX = -1, startPY = -1;
 let baseSnapshot = null;
+// Phase 3 选区
+let selDragMode = null;   // null | "new" | "move"
+let selDragStart = null;  // 移动起点 {x,y,origX,origY} 原始选区位置
+let selMoveBase = null;   // 移动预览基线（lift 前整帧快照）
 function saveBaseSnapshot(){
   baseSnapshot = snap();   // getImageData 读回（稳定路径）
 }
@@ -1303,6 +1344,196 @@ function rgbToHex(r,g,b){
   return "#" + [r,g,b].map(v=>clamp(Math.round(v),0,255).toString(16).padStart(2,"0")).join("");
 }
 function strokeColor(){ return state.tool==="eraser" ? "rgba(0,0,0,0)" : state.curColor; }
+
+/* ============ Phase 3 选区 ============ */
+function normRect(a,b){
+  return { x0: Math.min(a.x,b.x), y0: Math.min(a.y,b.y), x1: Math.max(a.x,b.x), y1: Math.max(a.y,b.y) };
+}
+function selWidth(){ return state.selRect ? (state.selRect.x1 - state.selRect.x0 + 1) : 0; }
+function selHeight(){ return state.selRect ? (state.selRect.y1 - state.selRect.y0 + 1) : 0; }
+function selInside(x,y){
+  if(!state.selRect) return false;
+  return x>=state.selRect.x0 && x<=state.selRect.x1 && y>=state.selRect.y0 && y<=state.selRect.y1;
+}
+function renderSelectLayer(){
+  const layer = $("selectLayer");
+  layer.innerHTML = "";
+  if(state.tool!=="select" && state.clipMode===false){ layer.style.display="none"; return; }
+  // 粘贴浮动 ghost
+  if(state.clipMode && state.selClip){
+    layer.style.display="block";
+    const g = document.createElement("div");
+    g.className = "ghost";
+    const c = document.createElement("canvas");
+    c.width = state.selClip.w; c.height = state.selClip.h;
+    const cc = c.getContext("2d");
+    const img = cc.createImageData(state.selClip.w, state.selClip.h);
+    img.data.set(state.selClip.data);
+    cc.putImageData(img,0,0);
+    g.appendChild(c);
+    c.style.width = (state.selClip.w * cell) + "px";
+    c.style.height = (state.selClip.h * cell) + "px";
+    g.style.left = (state.clipGhostX * cell) + "px";
+    g.style.top = (state.clipGhostY * cell) + "px";
+    layer.appendChild(g);
+    return;
+  }
+  // 选区 marquee
+  if(state.selRect && state.tool==="select"){
+    layer.style.display="block";
+    const m = document.createElement("div");
+    m.className = "marquee";
+    m.style.left = (state.selRect.x0 * cell) + "px";
+    m.style.top = (state.selRect.y0 * cell) + "px";
+    m.style.width = (selWidth() * cell) + "px";
+    m.style.height = (selHeight() * cell) + "px";
+    layer.appendChild(m);
+  }
+}
+function clearSelection(){
+  state.selRect = null;
+  if(state.clipMode){ state.clipMode = false; state.selClip = null; }
+  renderSelectLayer();
+}
+// 框选：拖拽时更新选区
+function updateSelection(a,b){
+  const r = normRect(a,b);
+  state.selRect = { x0: r.x0, y0: r.y0, x1: r.x1, y1: r.y1 };
+  renderSelectLayer();
+}
+// 读取选区像素到剪贴板
+function copySelection(){
+  if(!state.selRect) return false;
+  const w = selWidth(), h = selHeight();
+  const img = ctx.getImageData(state.selRect.x0, state.selRect.y0, w, h);
+  state.selClip = { w, h, data: new Uint8ClampedArray(img.data), offX: 0, offY: 0 };
+  return true;
+}
+// 粘贴：进入浮动放置模式
+function enterPaste(){
+  if(!state.selClip) return;
+  state.clipMode = true;
+  state.clipGhostX = state.selRect ? state.selRect.x0 : 0;
+  state.clipGhostY = state.selRect ? state.selRect.y0 : 0;
+  renderSelectLayer();
+}
+// 应用剪贴板到指定位置（不推历史）
+function blitClip(x,y){
+  if(!state.selClip) return;
+  const c = state.selClip;
+  const img = ctx.createImageData(c.w, c.h);
+  img.data.set(c.data);
+  ctx.putImageData(img, x, y);
+}
+// 移动选区：把选区内容搬走（原地透明），返回搬走的 ImageData
+function liftSelection(){
+  const r = state.selRect;
+  const img = ctx.getImageData(r.x0, r.y0, selWidth(), selHeight());
+  ctx.clearRect(r.x0, r.y0, selWidth(), selHeight());
+  return img;
+}
+// 粘贴浮动放置：应用到画布 + 写历史
+function syncClippedPlace(x,y){
+  const c = state.selClip;
+  ctx.putImageData((function(){
+    const img = ctx.createImageData(c.w, c.h);
+    img.data.set(c.data);
+    return img;
+  })(), x, y);
+  state.clipMode = false;
+  state.selClip = null;
+  renderSelectLayer();
+  pushHistory();
+  syncFrameFromCanvas();
+  updateFrameThumbs();
+  renderOnion();
+}
+// 翻转/旋转选区内容（原地，进历史由调用方 pushHistory）
+function transformSelection(kind){
+  if(!state.selRect) return;
+  const w = selWidth(), h = selHeight();
+  const src = ctx.getImageData(state.selRect.x0, state.selRect.y0, w, h).data;
+  const out = ctx.createImageData(w, h);
+  let nw = w, nh = h;
+  if(kind === "rotate"){
+    // 90° 旋转：宽高互换
+    nw = h; nh = w;
+  }
+  const outData = ctx.createImageData(nw, nh);
+  for(let y=0;y<nh;y++){
+    for(let x=0;x<nw;x++){
+      let sx, sy;
+      if(kind === "flipH"){ sx = w-1-x; sy = y; }
+      else if(kind === "flipV"){ sx = x; sy = h-1-y; }
+      else if(kind === "rotate"){
+        // 顺时针 90°：输出 (x,y) ← 源 (y, h-1-x)（h = 源高）
+        sx = y; sy = h-1-x;
+      }
+      if(sx<0||sx>=w||sy<0||sy>=h){ continue; }
+      const si = (sy*w + sx)*4, di = (y*nw + x)*4;
+      outData.data[di] = src[si]; outData.data[di+1] = src[si+1]; outData.data[di+2] = src[si+2]; outData.data[di+3] = src[si+3];
+    }
+  }
+  // 旋转几何变化：旧选区清空，若新尺寸超出边界则不允许
+  if(kind === "rotate"){
+    const nx = state.selRect.x0, ny = state.selRect.y0;
+    if(nx+nw > state.w || ny+nh > state.h){
+      alert("旋转后超出画布边界，请先缩小选区或换位置");
+      return;
+    }
+    ctx.clearRect(state.selRect.x0, state.selRect.y0, w, h);
+    ctx.putImageData(outData, nx, ny);
+    // 更新选区为新的宽高
+    state.selRect = { x0:nx, y0:ny, x1:nx+nw-1, y1:ny+nh-1 };
+  } else {
+    ctx.clearRect(state.selRect.x0, state.selRect.y0, w, h);
+    ctx.putImageData(outData, state.selRect.x0, state.selRect.y0);
+  }
+  renderSelectLayer();
+}
+
+/* ============ Phase 3 形状 ============ */
+function drawRectShape(x0,y0,x1,y1,color,fill){
+  const r = normRect({x:x0,y:y0},{x:x1,y:y1});
+  const w = r.x1-r.x0+1, h = r.y1-r.y0+1;
+  if(fill){
+    // 实心：每个像素 drawPixel（走对称）
+    for(let y=r.y0;y<=r.y1;y++){
+      for(let x=r.x0;x<=r.x1;x++){
+        drawPixel(x,y,color);
+      }
+    }
+  } else {
+    // 空心：四条边（去重顶点）
+    for(let x=r.x0;x<=r.x1;x++){ drawPixel(x,r.y0,color); drawPixel(x,r.y1,color); }
+    if(h>1) for(let y=r.y0+1;y<r.y1;y++){ drawPixel(r.x0,y,color); drawPixel(r.x1,y,color); }
+  }
+}
+function drawEllipseShape(x0,y0,x1,y1,color,fill){
+  const r = normRect({x:x0,y:y0},{x:x1,y:y1});
+  const cx = (r.x0+r.x1)/2, cy = (r.y0+r.y1)/2;
+  const rx = Math.max(1, (r.x1-r.x0+1)/2), ry = Math.max(1, (r.y1-r.y0+1)/2);
+  const left = Math.floor(cx-rx), top = Math.floor(cy-ry), right = Math.ceil(cx+rx), bottom = Math.ceil(cy+ry);
+  // 中点椭圆算法逐点判定（含边界）
+  for(let y=top;y<=bottom;y++){
+    for(let x=left;x<=right;x++){
+      const nx = (x-cx+0.5)/rx, ny = (y-cy+0.5)/ry;
+      const inside = nx*nx + ny*ny <= 1;
+      if(!inside) continue;
+      if(fill){
+        drawPixel(x,y,color);
+      } else {
+        // 空心：只在边界（检查相邻像素是否在圆内）
+        const adj = [
+          [(x-cx-0.5)/rx,(y-cy+0.5)/ry],[(x-cx+1.5)/rx,(y-cy+0.5)/ry],
+          [(x-cx+0.5)/rx,(y-cy-0.5)/ry],[(x-cx+0.5)/rx,(y-cy+1.5)/ry]
+        ];
+        const anyOutside = adj.some(function(a){ return a[0]*a[0]+a[1]*a[1] > 1; });
+        if(anyOutside) drawPixel(x,y,color);
+      }
+    }
+  }
+}
 
 /* ============ 帧管理（Phase 2 动画） ============ */
 let onionCanvas = null, onionCtx = null;
@@ -1562,13 +1793,45 @@ function onDown(e){
     renderPalette();
     return;
   }
-  drawing = true;
   const p = canvasPos(e);
+  // 选区工具：新建框选 / 拖移动选区 / 粘贴浮动置位
+  if(state.tool==="select"){
+    // 粘贴浮动模式：点击放置
+    if(state.clipMode && state.selClip){
+      syncClippedPlace(p.x,p.y);
+      return;
+    }
+    if(state.selRect && selInside(p.x,p.y)){
+      // 开始移动选区：先记录移动前状态（供撤销）
+      pushHistory();
+      drawing = true;
+      selDragMode = "move";
+      selDragStart = { x:p.x, y:p.y, origX:state.selRect.x0, origY:state.selRect.y0 };
+      // 抬起内容（原地透明）
+      state.selPending = liftSelection();
+      selMoveBase = snap();   // 基准：lift 后（选区已空）的整帧
+      renderSelectLayer();
+      return;
+    }
+    // 空白处：新建框选
+    drawing = true;
+    selDragMode = "new";
+    lastX = p.x; lastY = p.y;
+    updateSelection(p,p);
+    return;
+  }
+  drawing = true;
   lastX = p.x; lastY = p.y;
   pushHistory();                    // 记录本次 stroke 起点
   if(state.tool==="line"){
     lineStart = p;
     saveBaseSnapshot();             // 直线预览基线（getImageData）
+  }
+  if(state.tool==="rect" || state.tool==="ellipse"){
+    lineStart = p;
+    saveBaseSnapshot();
+    // 形状预览直接落笔（空心/实心即时画，onMove 恢复基线重画）
+    return;
   }
   applyToolAt(p.x,p.y,strokeColor());
 }
@@ -1596,12 +1859,37 @@ function applyToolAt(x,y,color){
   }
 }
 function onMove(e){
+  const p = canvasPos(e);
+  // 选区工具移动
+  if(state.tool==="select"){
+    if(!drawing) return;
+    e.preventDefault();
+    if(selDragMode === "new"){
+      updateSelection({x:lastX,y:lastY}, p);
+      return;
+    }
+    if(selDragMode === "move" && state.selPending){
+      e.preventDefault();
+      const dx = p.x - selDragStart.x, dy = p.y - selDragStart.y;
+      const nx = selDragStart.origX + dx, ny = selDragStart.origY + dy;
+      // 先恢复 lift 后基准（选区空），再贴到新位置
+      ctx.putImageData(selMoveBase,0,0);
+      state.selRect = { x0:nx, y0:ny, x1:nx+selWidth()-1, y1:ny+selHeight()-1 };
+      ctx.putImageData(state.selPending, nx, ny);
+      renderSelectLayer();
+      return;
+    }
+    return;
+  }
   if(!drawing) return;
   e.preventDefault();
-  const p = canvasPos(e);
   if(p.x===lastX && p.y===lastY) return;
   if(state.tool==="line"){
     linePreview(p);
+    return;
+  }
+  if(state.tool==="rect" || state.tool==="ellipse"){
+    shapePreview(p);
     return;
   }
   // 增量画「上次→当前」这一段，不恢复基线（恢复会擦掉已画的轨迹）
@@ -1620,6 +1908,11 @@ function onMove(e){
   }
   lastX = p.x; lastY = p.y;
 }
+function shapePreview(p){
+  ctx.putImageData(baseSnapshot,0,0);   // 恢复基线
+  if(state.tool==="rect") drawRectShape(lineStart.x, lineStart.y, p.x, p.y, "rgba(255,255,255,.6)", state.shapeFill);
+  else if(state.tool==="ellipse") drawEllipseShape(lineStart.x, lineStart.y, p.x, p.y, "rgba(255,255,255,.6)", state.shapeFill);
+}
 function linePreview(p){
   ctx.putImageData(baseSnapshot,0,0);   // 恢复基线
   paintLine(lineStart.x, lineStart.y, p.x, p.y, "rgba(255,255,255,.6)");
@@ -1628,11 +1921,39 @@ function onUp(e){
   if(!drawing) return;
   e.preventDefault();
   drawing = false;
+  // 选区移动提交
+  if(state.tool==="select" && selDragMode==="move" && state.selPending){
+    ctx.putImageData(selMoveBase,0,0);        // 恢复 lift 前
+    ctx.putImageData(state.selPending, state.selRect.x0, state.selRect.y0);  // 贴到最终位置
+    selMoveBase = null;
+    state.selPending = null;
+    selDragMode = null;
+    renderSelectLayer();
+    syncFrameFromCanvas();
+    updateFrameThumbs();
+    renderOnion();
+    return;
+  }
+  // 选区新建完成（只是画框，不落笔）
+  if(state.tool==="select" && selDragMode==="new"){
+    selDragMode = null;
+    renderSelectLayer();
+    return;
+  }
   if(state.tool==="line" && lineStart){
     const p = canvasPos(e);
     // 恢复基线（预览帧可能残留半透明预览线）
     ctx.putImageData(baseSnapshot,0,0);
     paintLine(lineStart.x, lineStart.y, p.x, p.y, strokeColor());
+    lineStart = null;
+    baseSnapshot = null;
+  }
+  if((state.tool==="rect" || state.tool==="ellipse") && lineStart){
+    const p = canvasPos(e);
+    // 恢复基线再画最终形状（实色）
+    ctx.putImageData(baseSnapshot,0,0);
+    if(state.tool==="rect") drawRectShape(lineStart.x, lineStart.y, p.x, p.y, strokeColor(), state.shapeFill);
+    else drawEllipseShape(lineStart.x, lineStart.y, p.x, p.y, strokeColor(), state.shapeFill);
     lineStart = null;
     baseSnapshot = null;
   }
@@ -2015,6 +2336,10 @@ function bindUI(){
       state.tool = btn.dataset.tool;
       document.querySelectorAll("[data-tool]").forEach(function(b){ b.classList.remove("active"); });
       btn.classList.add("active");
+      // 面板显隐
+      $("shapeGroup").style.display = (state.tool==="rect" || state.tool==="ellipse") ? "" : "none";
+      $("selectGroup").style.display = (state.tool==="select") ? "" : "none";
+      if(state.tool!=="select"){ renderSelectLayer(); }
     });
   });
   // 笔刷
@@ -2126,6 +2451,44 @@ function bindUI(){
   $("symmetrySelect").addEventListener("change", function(){
     state.symmetry = this.value;
   });
+  // 形状填充
+  $("shapeFill").addEventListener("change", function(){
+    state.shapeFill = this.checked;
+  });
+  // 选区操作按钮
+  $("btnSelFlipH").addEventListener("click", function(){
+    if(!state.selRect){ alert("先框选一块区域"); return; }
+    pushHistory();
+    transformSelection("flipH");
+    syncFrameFromCanvas();
+    updateFrameThumbs();
+    renderOnion();
+  });
+  $("btnSelFlipV").addEventListener("click", function(){
+    if(!state.selRect){ alert("先框选一块区域"); return; }
+    pushHistory();
+    transformSelection("flipV");
+    syncFrameFromCanvas();
+    updateFrameThumbs();
+    renderOnion();
+  });
+  $("btnSelRotate").addEventListener("click", function(){
+    if(!state.selRect){ alert("先框选一块区域"); return; }
+    pushHistory();
+    transformSelection("rotate");
+    syncFrameFromCanvas();
+    updateFrameThumbs();
+    renderOnion();
+  });
+  $("btnSelCopy").addEventListener("click", function(){
+    if(copySelection()){ $("cursorPos").textContent = "已复制选区"; }
+    else alert("先框选一块区域");
+  });
+  $("btnSelPaste").addEventListener("click", function(){
+    if(state.selClip) enterPaste();
+    else alert("剪贴板为空，先复制选区 (Ctrl+C)");
+  });
+  $("btnSelClear").addEventListener("click", clearSelection);
   // 自动保存：关键操作后防抖保存
   let saveTimer = null;
   function scheduleSave(){
@@ -2152,6 +2515,12 @@ function bindUI(){
       if(e.shiftKey) redo(); else undo();
     } else if((e.ctrlKey || e.metaKey) && e.key.toLowerCase()==="y"){
       e.preventDefault(); redo();
+    } else if((e.ctrlKey || e.metaKey) && e.key.toLowerCase()==="c"){
+      if(state.tool==="select"){ e.preventDefault(); copySelection(); }
+    } else if((e.ctrlKey || e.metaKey) && e.key.toLowerCase()==="v"){
+      if(state.tool==="select" && state.selClip){ e.preventDefault(); enterPaste(); }
+    } else if(e.key==="Escape"){
+      if(state.tool==="select"){ e.preventDefault(); clearSelection(); }
     } else if(e.key==="F1"){
       e.preventDefault(); openTutorial();
     }
@@ -2229,6 +2598,10 @@ function init(){
     openTutorial();
     localStorage.setItem("pixelstudio_tutorial_done","1");
   }
+  // 初始面板状态
+  $("shapeGroup").style.display = "none";
+  $("selectGroup").style.display = "none";
+  renderSelectLayer();
 }
 init();
 </script>
