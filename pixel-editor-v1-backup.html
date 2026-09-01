@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>PixelStudio · 像素画编辑器</title>
+<style>
+  :root{
+    --bg:#1b1b1f; --panel:#26262c; --panel2:#2e2e36; --line:#3a3a44;
+    --text:#e8e8ea; --dim:#9a9aa5; --accent:#ffd166; --accent2:#5aa9e6;
+    --danger:#ef6e6e; --ok:#7ed6a0;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:"PingFang SC","Microsoft YaHei","Noto Sans CJK SC",system-ui,sans-serif;
+    display:flex; flex-direction:column; overflow:hidden;
+    -webkit-user-select:none; user-select:none;
+  }
+  button{font-family:inherit; color:inherit; background:none; border:none; cursor:pointer;}
+  button:focus{outline:none;}
+  .px-btn{
+    background:var(--panel2); border:2px solid var(--line);
+    box-shadow:0 3px 0 var(--line);
+    padding:6px 10px; font-size:13px; border-radius:2px;
+    display:inline-flex; align-items:center; gap:6px;
+    transition:transform .05s, box-shadow .05s;
+  }
+  .px-btn:hover{background:#383840;}
+  .px-btn:active{transform:translateY(3px); box-shadow:0 0 0 var(--line);}
+  .px-btn.active{background:var(--accent); color:#1b1b1f; border-color:var(--accent);}
+  .px-btn.primary{background:var(--accent); color:#1b1b1f; border-color:var(--accent);}
+  .px-btn.icon-only{width:34px;height:34px;padding:0;justify-content:center;font-size:17px;}
+  select, input[type=number]{
+    background:var(--panel2); color:var(--text); border:2px solid var(--line);
+    padding:5px 8px; font-size:13px; border-radius:2px; font-family:inherit;
+  }
+  input[type=number]{width:64px;}
+  select:focus,input:focus{outline:2px solid var(--accent2);}
+  input[type=color]{width:34px;height:34px;border:2px solid var(--line);border-radius:2px;background:none;padding:0;cursor:pointer;}
+  input[type=color]::-webkit-color-swatch-wrapper{padding:2px;}
+  input[type=color]::-webkit-color-swatch{border:none;}
+  .brand{font-size:16px; font-weight:800; letter-spacing:1px; display:flex; align-items:center; gap:8px; margin-right:4px;}
+  .brand b{color:var(--accent); text-shadow:2px 2px 0 #8f6a1f;}
+  .sep{width:2px; height:24px; background:var(--line);}
+  .tool-label{font-size:11px; color:var(--dim); margin-right:-4px;}
+  #sizeInfo{font-size:12px; color:var(--dim); font-family:ui-monospace,Menlo,Consolas,monospace; white-space:nowrap;}
+  #topbar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:8px 12px; background:var(--panel); border-bottom:3px solid var(--line);}
+  #main{flex:1; display:flex; min-height:0;}
+  #sidebar{width:150px; background:var(--panel); border-right:3px solid var(--line); padding:10px; overflow-y:auto; flex-shrink:0;}
+  .side-group{margin-bottom:14px;}
+  .side-title{font-size:11px; color:var(--dim); margin-bottom:6px; letter-spacing:1px;}
+  .tool-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:6px;}
+  .tool-grid .px-btn{flex-direction:column; font-size:12px; padding:8px 4px;}
+  .tool-grid .px-btn span:first-child{font-size:19px; line-height:1;}
+  .mini-label{font-size:12px; color:var(--dim); margin-bottom:4px; display:block;}
+  .row{display:flex; align-items:center; gap:6px; margin-bottom:8px;}
+  .switch{display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px;}
+  .switch input{display:none;}
+  .switch .knob{width:34px; height:20px; border-radius:12px; background:#44444e; position:relative; transition:background .15s; border:2px solid var(--line);}
+  .switch .knob::after{content:""; position:absolute; top:-1px; left:-1px; width:18px; height:18px; border-radius:50%; background:#ccc; transition:transform .15s;}
+  .switch input:checked + .knob{background:var(--accent);}
+  .switch input:checked + .knob::after{transform:translateX(14px); background:#1b1b1f;}
+  #brushSizeVal{font-family:ui-monospace,monospace; font-size:12px; color:var(--accent);}
+  #canvasWrap{flex:1; display:flex; align-items:center; justify-content:center; overflow:auto; position:relative; padding:24px; background:#141417;}
+  #canvasStage{position:relative; box-shadow:0 6px 30px rgba(0,0,0,.5); border:1px solid #000;}
+  #gridCanvas{display:block; image-rendering:pixelated; image-rendering:crisp-edges; position:relative; z-index:2; cursor:crosshair; touch-action:none;}
+  #checker{position:absolute; inset:0; z-index:0; background:repeating-conic-gradient(#3a3a42 0% 25%, #26262c 0% 50%); background-size:16px 16px;}
+  #gridlines{position:absolute; inset:0; z-index:1; pointer-events:none;}
+  #rightbar{width:168px; background:var(--panel); border-left:3px solid var(--line); padding:10px; overflow-y:auto; flex-shrink:0;}
+  #paletteGrid{display:grid; grid-template-columns:repeat(4,1fr); gap:5px;}
+  .swatch{width:100%; aspect-ratio:1; border:2px solid #000; border-radius:2px; cursor:pointer; position:relative; transition:transform .05s;}
+  .swatch:hover{transform:scale(1.12); z-index:3;}
+  .swatch.sel{outline:2px solid #fff; outline-offset:1px;}
+  .swatch.add{border:2px dashed var(--line); display:flex; align-items:center; justify-content:center; color:var(--dim); font-size:18px; background:var(--panel2);}
+  #statusbar{padding:6px 12px; background:var(--panel); border-top:3px solid var(--line); display:flex; justify-content:space-between; font-size:12px; color:var(--dim); font-family:ui-monospace,Menlo,Consolas,monospace;}
+  #statusbar b{color:var(--text); font-weight:600;}
+  .modal-mask{position:fixed; inset:0; background:rgba(0,0,0,.72); z-index:100; display:flex; align-items:center; justify-content:center; padding:20px;}
+  .modal{background:var(--panel); border:3px solid var(--line); box-shadow:0 10px 40px #000; max-width:720px; width:100%; max-height:86vh; display:flex; flex-direction:column; border-radius:4px;}
+  .modal-head{padding:12px 16px; border-bottom:2px solid var(--line); display:flex; align-items:center; justify-content:space-between;}
+  .modal-head h2{font-size:17px; display:flex; align-items:center; gap:8px;}
+  .modal-body{padding:16px; overflow-y:auto; line-height:1.75; font-size:14px;}
+  .modal-body h3{font-size:15px; color:var(--accent); margin:16px 0 6px;}
+  .modal-body h3:first-child{margin-top:0;}
+  .modal-body p{margin-bottom:10px;}
+  .modal-body ul{margin:0 0 10px 20px;}
+  .modal-body li{margin-bottom:4px;}
+  .modal-body code{background:var(--panel2); padding:1px 6px; border-radius:2px; font-size:13px; color:var(--accent2);}
+  .modal-foot{padding:10px 16px; border-top:2px solid var(--line); display:flex; justify-content:flex-end; gap:8px;}
+  .demo-row{display:flex; gap:14px; align-items:center; margin:10px 0;}
+  .demo-box{width:52px; height:52px; image-rendering:pixelated; background:#141417; border:2px solid var(--line);}
+  .shortcut{display:inline-block; min-width:64px;}
+  .close-x{font-size:20px; color:var(--dim); padding:4px 8px;}
+  .close-x:hover{color:var(--text);}
+  .hidden{display:none!important;}
+  @media (max-width:760px){
+    #sidebar{width:118px; padding:8px;}
+    #rightbar{width:132px; padding:8px;}
+    .tool-grid{grid-template-columns:1fr;}
+    .brand span{display:none;}
+  }
+</style>
+</head>
+<body>
+<!-- 顶栏 -->
+<div id="topbar">
+  <div class="brand"><b>PixelStudio</b><span>像素画编辑器</span></div>
+  <div class="sep"></div>
+  <button class="px-btn" id="btnOpenTutorial" title="教程 (F1)">📖 教程</button>
+  <div class="sep"></div>
+  <button class="px-btn" id="btnUndo" title="撤销 (Ctrl+Z)">↩️ 撤销</button>
+  <button class="px-btn" id="btnRedo" title="重做 (Ctrl+Y)">↪️ 重做</button>
+  <div class="sep"></div>
+  <button class="px-btn primary" id="btnImport">🖼️ 导入图片→像素画</button>
+  <button class="px-btn" id="btnExport" title="导出 PNG">💾 导出 PNG</button>
+  <input type="file" id="fileInput" accept="image/*" class="hidden">
+  <div style="flex:1"></div>
+  <div id="sizeInfo"></div>
+</div>
+
+<div id="main">
+  <!-- 左栏工具 -->
+  <div id="sidebar">
+    <div class="side-group">
+      <div class="side-title">✏️ 工具</div>
+      <div class="tool-grid">
+        <button class="px-btn active" data-tool="pen"><span>🖊️</span>画笔</button>
+        <button class="px-btn" data-tool="eraser"><span>🩷</span>橡皮</button>
+        <button class="px-btn" data-tool="fill"><span>🪣</span>填充</button>
+        <button class="px-btn" data-tool="picker"><span>💉</span>取色</button>
+        <button class="px-btn" data-tool="line"><span>📏</span>直线</button>
+      </div>
+    </div>
+    <div class="side-group">
+      <div class="side-title">🛠️ 笔刷</div>
+      <label class="mini-label">大小 <b id="brushSizeVal">1</b></label>
+      <input type="range" id="brushSize" min="1" max="16" value="1" style="width:100%">
+    </div>
+    <div class="side-group">
+      <div class="side-title">📐 画布尺寸</div>
+      <div class="row">
+        <select id="sizePreset">
+          <option value="64">64 × 64</option>
+          <option value="48">48 × 48</option>
+          <option value="32">32 × 32</option>
+          <option value="16">16 × 16</option>
+          <option value="custom">自定义…</option>
+        </select>
+      </div>
+      <label class="switch"><input type="checkbox" id="gridToggle" checked><span class="knob"></span>网格</label>
+    </div>
+  </div>
+
+  <!-- 画布区 -->
+  <div id="canvasWrap">
+    <div id="canvasStage">
+      <div id="checker"></div>
+      <div id="gridlines"></div>
+      <canvas id="gridCanvas"></canvas>
+    </div>
+  </div>
+
+  <!-- 右栏调色板 -->
+  <div id="rightbar">
+    <div class="side-group">
+      <div class="side-title">🎨 调色板</div>
+      <div class="row">
+        <select id="paletteSelect">
+          <option value="pico8">PICO-8（16色）</option>
+          <option value="gb">GameBoy（4色）</option>
+          <option value="custom">我的调色板</option>
+        </select>
+        <button class="px-btn icon-only" id="btnAddColor" title="把当前颜色加入调色板">➕</button>
+        <button class="px-btn icon-only" id="btnDelColor" title="删除选中色" style="color:var(--danger)">✖</button>
+      </div>
+      <div id="paletteGrid"></div>
+    </div>
+    <div class="side-group">
+      <div class="side-title">🖌️ 当前颜色</div>
+      <div class="row">
+        <input type="color" id="colorPicker" value="#ffd166">
+        <div id="colorHex" style="font-size:12px; font-family:ui-monospace,monospace; color:var(--dim);"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="statusbar">
+  <div>🖱️ <span id="cursorPos">—</span></div>
+  <div>💾 撤销 <b id="undoCount">0</b> · 重做 <b id="redoCount">0</b></div>
+</div>
+
+<!-- 教程弹窗 -->
+<div class="modal-mask hidden" id="tutorialModal">
+  <div class="modal">
+    <div class="modal-head"><h2>📖 像素画入门教程</h2><button class="close-x" id="btnCloseTutorial">✕</button></div>
+    <div class="modal-body">
+      <h3>1️⃣ 像素是什么？</h3>
+      <p>像素画（Pixel Art）就是 <b>一格一格</b> 画的画。每一格称为一个「像素」，放大看就是一个个小方块，缩小看就能组成生动的图像——这就是复古游戏的画面风格。</p>
+      <div class="demo-row">
+        <canvas class="demo-box" id="demoHeart"></canvas>
+        <span>像这样：16×16 的一颗小爱心 ❤️（图标是画出来的示例）</span>
+      </div>
+      <h3>2️⃣ 怎么画线？</h3>
+      <p>选 <b>画笔</b> 🖊️，点一下放一格，<b>按住拖动</b> 连续画线。用 <b>直线工具</b> 📏 点起点、拖到终点松开，画一条笔直的线。</p>
+      <h3>3️⃣ 怎么配色？</h3>
+      <p>右侧是<b>调色板</b>，点任意色块，它就是当前颜色。</p>
+      <ul>
+        <li><b>PICO-8</b>：复古掌机的经典 16 色，像素画圈公认好看</li>
+        <li><b>GameBoy</b>：4 色灰度，最纯粹的像素味道</li>
+        <li>想换颜色？用底部 🖌️ 颜色选择器，点 <code>➕</code> 加入你的调色板</li>
+      </ul>
+      <h3>4️⃣ 明暗与立体感</h3>
+      <p>同一种颜色分 3 层：<b>暗色</b>（阴影）→ <b>本色</b>（主体）→ <b>亮色</b>（高光）。比如球体左上亮、右下暗，一下就"鼓"起来了。</p>
+      <h3>5️⃣ 抖动（Dithering）技法</h3>
+      <p>两色交界处画<b>交替的小点</b>（⚪⚫⚪⚫），远处看会"混"出中间色。这是像素画做渐变、做透明感的核心技巧。</p>
+      <div class="demo-row">
+        <canvas class="demo-box" id="demoDither"></canvas>
+        <span>黑白点交替 = 看起来是灰色渐变</span>
+      </div>
+      <h3>6️⃣ 小技巧</h3>
+      <ul>
+        <li><span class="shortcut">🖼️ 导入</span>照片或图片，一键变像素画，再改细节</li>
+        <li><span class="shortcut">↩️ 撤销</span><code>Ctrl+Z</code> / <span class="shortcut">↪️ 重做</span><code>Ctrl+Y</code> 随便试错</li>
+        <li><span class="shortcut">💾 导出</span>PNG 选 4x / 8x，图片更大更清晰</li>
+        <li>先大轮廓 → 再上色 → 最后明暗，是最顺的画法</li>
+      </ul>
+    </div>
+    <div class="modal-foot"><button class="px-btn primary" id="btnCloseTutorial2">开始画画 🚀</button></div>
+  </div>
+</div>
+
+<!-- 导入选项弹窗 -->
+<div class="modal-mask hidden" id="importModal">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-head"><h2>🖼️ 导入图片转像素画</h2><button class="close-x" id="btnCloseImport">✕</button></div>
+    <div class="modal-body">
+      <p>图片按比例缩小后<b>居中</b>画到当前画布（透明部分保留）。</p>
+      <div class="side-title">🎨 颜色模式</div>
+      <label class="switch" style="margin-bottom:10px"><input type="checkbox" id="importUsePalette" checked><span class="knob"></span>映射到当前调色板</label>
+      <div id="importColorCountRow" class="row">
+        <label class="mini-label" style="margin:0">颜色数</label>
+        <select id="importColorCount">
+          <option value="16">16</option>
+          <option value="32">32</option>
+          <option value="64">64</option>
+          <option value="128">128</option>
+        </select>
+      </div>
+      <p style="font-size:12px;color:var(--dim)">映射调色板 = 成品像素感更强；自定义颜色数 = 更接近原图渐变。</p>
+    </div>
+    <div class="modal-foot"><button class="px-btn primary" id="btnApplyImport">转换并导入 ✅</button></div>
+  </div>
+</div>
+
+<!-- 导出弹窗 -->
+<div class="modal-mask hidden" id="exportModal">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-head"><h2>💾 导出 PNG</h2><button class="close-x" id="btnCloseExport">✕</button></div>
+    <div class="modal-body">
+      <div class="row">
+        <label class="mini-label" style="margin:0">放大倍数</label>
+        <select id="exportScale">
+          <option value="1">1x（原始大小）</option>
+          <option value="2">2x</option>
+          <option value="4" selected>4x</option>
+          <option value="8">8x</option>
+        </select>
+      </div>
+      <p id="exportSizeInfo" style="font-size:12px;color:var(--dim)"></p>
+      <p style="font-size:12px;color:var(--dim)">导出无缩放的纯像素 PNG，放大后边缘依旧清晰。</p>
+    </div>
+    <div class="modal-foot"><button class="px-btn primary" id="btnDoExport">保存 PNG 💾</button></div>
+  </div>
+</div>
+<script id="app-js">
+"use strict";
+function $(id){ return document.getElementById(id); }
+function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
+
+/* ============ 调色板数据 ============ */
+const PICO8 = [ "#000000","#1D2B53","#7E2553","#008751","#AB5236","#5F574F",
+  "#C2C3C7","#FFF1E8","#FF004D","#FFA300","#FFEC27","#00E436",
+  "#29ADFF","#83769C","#FF77A8","#FFCCAA" ];
+const GB = [ "#0F380F","#306230","#8BAC0F","#9BBC0F" ];
+const PALETTES = { pico8: PICO8.slice(), gb: GB.slice() };
+
+/* ============ 状态 ============ */
+let state = {
+  w: 64, h: 64,
+  tool: "pen",
+  brush: 1,
+  curColor: "#ffd166",
+  paletteType: "pico8",
+  customPalette: [],
+  selectedSwatch: -1,
+  gridOn: true,
+  showPreview: false,
+  pendingImage: null,   // 导入待转换的 Image
+  undoStack: [], redoStack: [],
+};
+let canvas, ctx, cell = 10;
+let drawing = false, lastX = -1, lastY = -1, lineStart = null, startPX = -1, startPY = -1;
+let baseSnapshot = null;
+function saveBaseSnapshot(){
+  baseSnapshot = snap();   // getImageData 读回（稳定路径）
+}
+
+/* ============ 画布 ============ */
+function resizeCanvas(w, h){
+  state.w = w; state.h = h;
+  canvas.width = w; canvas.height = h;
+  ctx.fillStyle = "rgba(0,0,0,0)";
+  ctx.clearRect(0,0,w,h);
+  updateStageSize();
+  render();
+}
+function updateStageSize(){
+  const dpr = window.devicePixelRatio || 1;
+  canvas.style.width = (state.w * cell) + "px";
+  canvas.style.height = (state.h * cell) + "px";
+  $("gridlines").style.backgroundSize = cell + "px " + cell + "px";
+  const g = $("gridlines");
+  g.style.backgroundImage = state.gridOn
+    ? "linear-gradient(to right, rgba(255,255,255,.08) 1px, transparent 1px),linear-gradient(to bottom, rgba(255,255,255,.08) 1px, transparent 1px)"
+    : "none";
+  $("sizeInfo").textContent = state.w + "×" + state.h + "  ·  " + (state.w*state.h) + " px";
+}
+function canvasPos(e){
+  const r = canvas.getBoundingClientRect();
+  const cx = e.touches ? e.touches[0].clientX : e.clientX;
+  const cy = e.touches ? e.touches[0].clientY : e.clientY;
+  const px = Math.floor((cx - r.left) / (r.width / state.w));
+  const py = Math.floor((cy - r.top) / (r.height / state.h));
+  return { x: clamp(px,0,state.w-1), y: clamp(py,0,state.h-1) };
+}
+function render(){
+  ctx.imageSmoothingEnabled = false;
+  // drawImage 自拷贝确保 paint 状态一致（GPU 路径，无 getImageData 读回）
+  ctx.drawImage(canvas, 0, 0);
+}
+function pixels(){
+  return ctx.getImageData(0,0,state.w,state.h);
+}
+function drawPixel(x,y,color){
+  if(color === "rgba(0,0,0,0)"){
+    ctx.clearRect(x, y, 1, 1);
+  } else {
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, 1, 1);
+  }
+}
+function getPixel(x,y){
+  const d = ctx.getImageData(x, y, 1, 1);
+  return [d.data[0], d.data[1], d.data[2], d.data[3]];
+}
+function setPixelInData(d, x, y, r, g, b, a){
+  const i = (y*state.w + x)*4;
+  d.data[i]=r; d.data[i+1]=g; d.data[i+2]=b; d.data[i+3]=a;
+}
+function hexToRgb(h){
+  h = h.replace("#","");
+  if(h.length===3) h = h.split("").map(c=>c+c).join("");
+  return [parseInt(h.substr(0,2),16), parseInt(h.substr(2,2),16), parseInt(h.substr(4,2),16)];
+}
+function rgbToHex(r,g,b){
+  return "#" + [r,g,b].map(v=>clamp(Math.round(v),0,255).toString(16).padStart(2,"0")).join("");
+}
+function strokeColor(){ return state.tool==="eraser" ? "rgba(0,0,0,0)" : state.curColor; }
+
+/* ============ 撤销 / 重做 ============ */
+function snap(){ return ctx.getImageData(0,0,state.w,state.h); }
+function pushHistory(){
+  state.undoStack.push(snap());
+  if(state.undoStack.length > 200) state.undoStack.shift();
+  state.redoStack = [];
+  updateHUD();
+}
+function undo(){
+  if(!state.undoStack.length) return;
+  state.redoStack.push(snap());
+  const s = state.undoStack.pop();
+  ctx.putImageData(s,0,0);
+  updateHUD();
+}
+function redo(){
+  if(!state.redoStack.length) return;
+  state.undoStack.push(snap());
+  const s = state.redoStack.pop();
+  ctx.putImageData(s,0,0);
+  updateHUD();
+}
+function updateHUD(){
+  $("undoCount").textContent = state.undoStack.length;
+  $("redoCount").textContent = state.redoStack.length;
+}
+/* ============ 绘制 ============ */
+function floodFill(x, y, fillColor){
+  const target = getPixel(x,y);
+  const fr = fillColor==="rgba(0,0,0,0)" ? null : hexToRgb(fillColor);
+  if(fr && target[0]===fr[0] && target[1]===fr[1] && target[2]===fr[2] && target[3]===255) return;
+  if(!fr && target[3]===0) return;
+  const img = ctx.getImageData(0,0,state.w,state.h);
+  const d = img.data;
+  const W = state.w, H = state.h;
+  const stack = [[x,y]];
+  const tc = [target[0],target[1],target[2],target[3]];
+  const match = (i)=>
+    d[i]===tc[0] && d[i+1]===tc[1] && d[i+2]===tc[2] && d[i+3]===tc[3];
+  const write = (i)=>{
+    if(fr){ d[i]=fr[0]; d[i+1]=fr[1]; d[i+2]=fr[2]; d[i+3]=255; }
+    else  { d[i+3]=0; }
+  };
+  while(stack.length){
+    const p = stack.pop();
+    const px = p[0], py = p[1];
+    const i = (py*W + px)*4;
+    if(!match(i)) continue;
+    write(i);
+    // 向左/右扩展
+    let left = px-1, right = px+1;
+    while(left>=0 && match((py*W+left)*4)){ write((py*W+left)*4); left--; }
+    while(right<W && match((py*W+right)*4)){ write((py*W+right)*4); right++; }
+    left++; right--;
+    // 上下扫描线
+    if(py>0)   { for(let xx=left; xx<=right; xx++){ const si=( (py-1)*W+xx)*4; if(match(si)) stack.push([xx,py-1]); } }
+    if(py<H-1) { for(let xx=left; xx<=right; xx++){ const si=( (py+1)*W+xx)*4; if(match(si)) stack.push([xx,py+1]); } }
+  }
+  ctx.putImageData(img,0,0);
+}
+function paintLine(x0,y0,x1,y1,color){
+  // Bresenham
+  const dx=Math.abs(x1-x0), dy=Math.abs(y1-y0);
+  const sx=x0<x1?1:-1, sy=y0<y1?1:-1;
+  let err=dx-dy;
+  while(true){
+    drawPixel(x0,y0,color);
+    if(x0===x1 && y0===y1) break;
+    const e2=2*err;
+    if(e2>-dy){ err-=dy; x0+=sx; }
+    if(e2<dx){ err+=dx; y0+=sy; }
+  }
+}
+function onDown(e){
+  e.preventDefault();
+  // 取色立即生效
+  if(state.tool==="picker"){
+    const p = canvasPos(e);
+    const c = getPixel(p.x,p.y);
+    if(c[3]===0){ state.curColor = "#000000"; }
+    else state.curColor = rgbToHex(c[0],c[1],c[2]);
+    $("colorPicker").value = state.curColor;
+    $("colorHex").textContent = state.curColor;
+    renderPalette();
+    return;
+  }
+  drawing = true;
+  const p = canvasPos(e);
+  lastX = p.x; lastY = p.y;
+  pushHistory();                    // 记录本次 stroke 起点
+  if(state.tool==="line"){
+    lineStart = p;
+    saveBaseSnapshot();             // 直线预览基线（getImageData）
+  }
+  applyToolAt(p.x,p.y,strokeColor());
+}
+function applyToolAt(x,y,color){
+  if(state.tool==="pen" || state.tool==="eraser"){
+    const b = state.brush;
+    if(b<=1){ drawPixel(x,y,color); }
+    else {
+      const off = Math.floor(b/2);
+      for(let dy=0; dy<b; dy++) for(let dx=0; dx<b; dx++){
+        drawPixel(clamp(x+dx-off,0,state.w-1), clamp(y+dy-off,0,state.h-1), color);
+      }
+    }
+  } else if(state.tool==="fill"){
+    floodFill(x,y,color);
+  } else if(state.tool==="line"){
+    if(lineStart) paintLine(lineStart.x, lineStart.y, x, y, color);
+  }
+}
+function onMove(e){
+  if(!drawing) return;
+  e.preventDefault();
+  const p = canvasPos(e);
+  if(p.x===lastX && p.y===lastY) return;
+  if(state.tool==="line"){
+    linePreview(p);
+    return;
+  }
+  // 增量画「上次→当前」这一段，不恢复基线（恢复会擦掉已画的轨迹）
+  const b = state.brush;
+  if(b<=1) paintLine(lastX,lastY,p.x,p.y,strokeColor());
+  else {
+    const steps = Math.max(Math.abs(p.x-lastX), Math.abs(p.y-lastY));
+    for(let i=1;i<=steps;i++){
+      const tx = Math.round(lastX + (p.x-lastX)*i/steps);
+      const ty = Math.round(lastY + (p.y-lastY)*i/steps);
+      const off = Math.floor(b/2);
+      for(let dy=0; dy<b; dy++) for(let dx=0; dx<b; dx++){
+        drawPixel(clamp(tx+dx-off,0,state.w-1), clamp(ty+dy-off,0,state.h-1), strokeColor());
+      }
+    }
+  }
+  lastX = p.x; lastY = p.y;
+}
+function linePreview(p){
+  ctx.putImageData(baseSnapshot,0,0);   // 恢复基线
+  paintLine(lineStart.x, lineStart.y, p.x, p.y, "rgba(255,255,255,.6)");
+}
+function onUp(e){
+  if(!drawing) return;
+  e.preventDefault();
+  drawing = false;
+  if(state.tool==="line" && lineStart){
+    const p = canvasPos(e);
+    // 恢复基线（预览帧可能残留半透明预览线）
+    ctx.putImageData(baseSnapshot,0,0);
+    paintLine(lineStart.x, lineStart.y, p.x, p.y, strokeColor());
+    lineStart = null;
+    baseSnapshot = null;
+  }
+}
+
+function bindCanvasEvents(){
+  const cv = $("gridCanvas");
+  cv.addEventListener("mousedown", onDown);
+  cv.addEventListener("mousemove", onMove);
+  cv.addEventListener("mouseup", onUp);
+  // 鼠标拖出画布外松开也能结束绘制（window 兜底；必须带有效坐标，否则 canvasPos 得 NaN 会死循环）
+  window.addEventListener("mouseup", function(e){
+    if(!drawing) return;
+    if(typeof e.clientX !== "number" || isNaN(e.clientX)) return;
+    onUp(e);
+  });
+  cv.addEventListener("touchstart", function(e){ if(e.touches.length===1) onDown(e); }, {passive:false});
+  cv.addEventListener("touchmove", function(e){ if(e.touches.length===1) onMove(e); }, {passive:false});
+  cv.addEventListener("touchend", function(e){ onUp(e); }, {passive:false});
+  cv.addEventListener("contextmenu", function(e){ e.preventDefault(); });
+  cv.addEventListener("mousemove", function(e){
+    $("cursorPos").textContent = canvasPos(e) ? (canvasPos(e).x + "," + canvasPos(e).y) : "—";
+  });
+  cv.addEventListener("mouseleave", function(){ $("cursorPos").textContent = "—"; });
+}
+/* ============ 导入图片 → 像素画 ============ */
+function handleImageFile(file){
+  if(!file || !file.type.match(/^image\//)) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const img = new Image();
+    img.onload = function(){
+      state.pendingImage = img;
+      $("importModal").classList.remove("hidden");
+    };
+    img.onerror = function(){ alert("图片读取失败，请换一张试试"); };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function hexToRgbArr(h){
+  h = h.replace("#","");
+  if(h.length===3) h = h.split("").map(c=>c+c).join("");
+  return [parseInt(h.substr(0,2),16), parseInt(h.substr(2,2),16), parseInt(h.substr(4,2),16)];
+}
+function colorDist(a,b){
+  const dr=a[0]-b[0], dg=a[1]-b[1], db=a[2]-b[2];
+  return dr*dr+dg*dg+db*db;
+}
+function applyImport(){
+  const img = state.pendingImage;
+  if(!img) return;
+  const usePalette = $("importUsePalette").checked;
+  const colorCount = parseInt($("importColorCount").value,10);
+
+  // 降采样：目标尺寸取画布尺寸，等比 cover
+  const scale = Math.max(state.w / img.width, state.h / img.height);
+  const dw = Math.round(img.width * scale), dh = Math.round(img.height * scale);
+  const dx = Math.floor((state.w - dw)/2), dy = Math.floor((state.h - dh)/2);
+
+  const tmp = document.createElement("canvas");
+  tmp.width = state.w; tmp.height = state.h;
+  const tc = tmp.getContext("2d");
+  tc.imageSmoothingEnabled = false;
+  tc.drawImage(img, dx, dy, dw, dh);
+  const src = tc.getImageData(0,0,state.w,state.h);
+  const d = src.data;
+
+  // 取样颜色
+  let colors = [];
+  for(let i=0;i<d.length;i+=4){
+    if(d[i+3]===0) continue;
+    colors.push([d[i],d[i+1],d[i+2]]);
+  }
+  if(!colors.length){ alert("图片是透明的，没有可转换的颜色"); return; }
+
+  let finalColors;
+  if(usePalette){
+    // 映射到当前调色板：每个原始颜色找最近色板色
+    const pal = currentPalette();
+    finalColors = colors.map(c => {
+      let best = pal[0], bd = Infinity;
+      for(const pc of pal){
+        const dd = colorDist(c, pc);
+        if(dd < bd){ bd = dd; best = pc; }
+      }
+      return best;
+    });
+  } else {
+    // 中位切分量化（简单版：先把颜色去重后聚类到 colorCount 个）
+    finalColors = quantize(colors, colorCount);
+  }
+
+  // 把量化结果写回
+  const out = ctx.createImageData(state.w, state.h);
+  for(let i=0;i<d.length;i+=4){
+    if(d[i+3]===0){ out.data[i+3]=0; continue; }
+    const idx = Math.floor(i/4);
+    const c = finalColors[idx];
+    if(c){ out.data[i]=c[0]; out.data[i+1]=c[1]; out.data[i+2]=c[2]; out.data[i+3]=255; }
+  }
+  pushHistory();
+  ctx.putImageData(out,0,0);
+  closeImportModal();
+}
+function quantize(colors, k){
+  // 简单 K-means 聚类（颜色空间）
+  if(colors.length <= k) return colors.slice();
+  // 初始中心：均匀采样
+  let centers = [];
+  const step = Math.floor(colors.length / k);
+  for(let i=0;i<k;i++) centers.push(colors[Math.min(i*step, colors.length-1)].slice());
+  for(let iter=0; iter<6; iter++){
+    const buckets = Array.from({length:k}, ()=>[]);
+    for(const c of colors){
+      let bi = 0, bd = Infinity;
+      for(let i=0;i<k;i++){
+        const dd = colorDist(c, centers[i]);
+        if(dd<bd){ bd=dd; bi=i; }
+      }
+      buckets[bi].push(c);
+    }
+    let moved = false;
+    for(let i=0;i<k;i++){
+      if(!buckets[i].length) continue;
+      const avg = [0,0,0];
+      for(const c of buckets[i]){ avg[0]+=c[0]; avg[1]+=c[1]; avg[2]+=c[2]; }
+      avg[0]=Math.round(avg[0]/buckets[i].length);
+      avg[1]=Math.round(avg[1]/buckets[i].length);
+      avg[2]=Math.round(avg[2]/buckets[i].length);
+      if(colorDist(avg, centers[i])>0){ centers[i]=avg; moved=true; }
+    }
+    if(!moved) break;
+  }
+  // 把每个颜色映射到最近中心
+  return colors.map(c => {
+    let bi = 0, bd = Infinity;
+    for(let i=0;i<k;i++){
+      const dd = colorDist(c, centers[i]);
+      if(dd<bd){ bd=dd; bi=i; }
+    }
+    return centers[bi].slice();
+  });
+}
+function closeImportModal(){
+  $("importModal").classList.add("hidden");
+  state.pendingImage = null;
+}
+function closeExportModal(){ $("exportModal").classList.add("hidden"); }
+/* ============ 导出 PNG ============ */
+function exportPNG(){
+  const scale = parseInt($("exportScale").value,10);
+  const out = document.createElement("canvas");
+  out.width = state.w * scale; out.height = state.h * scale;
+  const oc = out.getContext("2d");
+  oc.imageSmoothingEnabled = false;
+  oc.drawImage(canvas, 0,0, state.w, state.h, 0,0, out.width, out.height);
+  const a = document.createElement("a");
+  a.download = "pixel-art-" + state.w + "x" + state.h + ".png";
+  a.href = out.toDataURL("image/png");
+  a.click();
+}
+
+/* ============ 调色板 UI ============ */
+function currentPalette(){
+  if(state.paletteType === "custom") return state.customPalette.slice();
+  return PALETTES[state.paletteType];
+}
+function renderPalette(){
+  const grid = $("paletteGrid");
+  grid.innerHTML = "";
+  const pal = currentPalette();
+  pal.forEach(function(c, i){
+    const sw = document.createElement("button");
+    sw.className = "swatch" + (i===state.selectedSwatch ? " sel" : "");
+    sw.style.background = c;
+    sw.dataset.idx = i;
+    sw.title = c;
+    sw.addEventListener("click", function(){
+      state.curColor = c;
+      state.selectedSwatch = i;
+      $("colorPicker").value = c;
+      $("colorHex").textContent = c;
+      renderPalette();
+    });
+    grid.appendChild(sw);
+  });
+  // 添加按钮
+  const add = document.createElement("button");
+  add.className = "swatch add";
+  add.textContent = "+";
+  add.title = "把当前颜色加入调色板";
+  add.addEventListener("click", function(){
+    const c = state.curColor;
+    if(state.paletteType==="custom"){
+      if(!state.customPalette.includes(c)) state.customPalette.push(c);
+    } else {
+      state.customPalette = currentPalette().concat([c]);
+      state.paletteType = "custom";
+      $("paletteSelect").value = "custom";
+    }
+    state.selectedSwatch = state.customPalette.length-1;
+    renderPalette();
+  });
+  grid.appendChild(add);
+  // 当为 custom 时显示删除按钮
+  $("btnDelColor").style.display = state.paletteType==="custom" ? "" : "none";
+}
+
+/* ============ UI 绑定 ============ */
+function bindUI(){
+  // 工具切换
+  document.querySelectorAll("[data-tool]").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      state.tool = btn.dataset.tool;
+      document.querySelectorAll("[data-tool]").forEach(function(b){ b.classList.remove("active"); });
+      btn.classList.add("active");
+    });
+  });
+  // 笔刷
+  $("brushSize").addEventListener("input", function(){
+    state.brush = parseInt(this.value,10);
+    $("brushSizeVal").textContent = state.brush;
+  });
+  // 网格
+  $("gridToggle").addEventListener("change", function(){
+    state.gridOn = this.checked;
+    updateStageSize();
+  });
+  // 尺寸预设
+  $("sizePreset").addEventListener("change", function(){
+    const v = this.value;
+    if(v === "custom"){
+      const w = prompt("画布宽度（1-256）：","32");
+      const h = prompt("画布高度（1-256）：","32");
+      const nw = parseInt(w,10), nh = parseInt(h,10);
+      if(nw>=1 && nw<=256 && nh>=1 && nh<=256){
+        resizeCanvas(nw,nh);
+        pushHistory();
+      } else {
+        this.value = "64";
+      }
+    } else {
+      const n = parseInt(v,10);
+      resizeCanvas(n,n);
+      pushHistory();
+    }
+  });
+  // 调色板选择
+  $("paletteSelect").addEventListener("change", function(){
+    state.paletteType = this.value;
+    state.selectedSwatch = -1;
+    renderPalette();
+  });
+  // 当前颜色
+  $("colorPicker").addEventListener("input", function(){
+    state.curColor = this.value;
+    $("colorHex").textContent = this.value;
+  });
+  // 删除调色板色
+  $("btnDelColor").addEventListener("click", function(){
+    if(state.paletteType!=="custom" || state.selectedSwatch<0) return;
+    state.customPalette.splice(state.selectedSwatch,1);
+    if(state.selectedSwatch >= state.customPalette.length) state.selectedSwatch = state.customPalette.length-1;
+    renderPalette();
+  });
+  // 撤销/重做
+  $("btnUndo").addEventListener("click", undo);
+  $("btnRedo").addEventListener("click", redo);
+  // 教程
+  $("btnOpenTutorial").addEventListener("click", openTutorial);
+  $("btnCloseTutorial").addEventListener("click", function(){ $("tutorialModal").classList.add("hidden"); });
+  $("btnCloseTutorial2").addEventListener("click", function(){ $("tutorialModal").classList.add("hidden"); });
+  // 导入
+  $("btnImport").addEventListener("click", function(){ $("fileInput").click(); });
+  $("fileInput").addEventListener("change", function(){
+    if(this.files && this.files[0]) handleImageFile(this.files[0]);
+    this.value = "";
+  });
+  $("btnCloseImport").addEventListener("click", closeImportModal);
+  $("btnApplyImport").addEventListener("click", applyImport);
+  $("importUsePalette").addEventListener("change", function(){
+    $("importColorCountRow").style.display = this.checked ? "none" : "";
+  });
+  $("importColorCountRow").style.display = "none";
+  // 导出
+  $("btnExport").addEventListener("click", function(){
+    const scale = parseInt($("exportScale").value,10);
+    $("exportSizeInfo").textContent = "输出尺寸：" + (state.w*scale) + " × " + (state.h*scale) + " px";
+    $("exportModal").classList.remove("hidden");
+  });
+  $("btnCloseExport").addEventListener("click", closeExportModal);
+  $("btnDoExport").addEventListener("click", function(){
+    exportPNG();
+    closeExportModal();
+  });
+  // 全局键盘
+  window.addEventListener("keydown", function(e){
+    if((e.ctrlKey || e.metaKey) && e.key.toLowerCase()==="z"){
+      e.preventDefault();
+      if(e.shiftKey) redo(); else undo();
+    } else if((e.ctrlKey || e.metaKey) && e.key.toLowerCase()==="y"){
+      e.preventDefault(); redo();
+    } else if(e.key==="F1"){
+      e.preventDefault(); openTutorial();
+    }
+  });
+}
+function openTutorial(){
+  drawDemoHeart();
+  drawDemoDither();
+  $("tutorialModal").classList.remove("hidden");
+}
+function drawDemoHeart(){
+  const cv = $("demoHeart");
+  if(!cv) return;
+  cv.width = 16; cv.height = 16;
+  const c = cv.getContext("2d");
+  const H = [
+    "0000000000000000",
+    "0110000000000110",
+    "0111000000001110",
+    "1111100000011111",
+    "1111110000111111",
+    "1111111001111111",
+    "1111111111111111",
+    "1111111111111111",
+    "0111111111111110",
+    "0011111111111100",
+    "0001111111111000",
+    "0000111111110000",
+    "0000011111100000",
+    "0000001111000000",
+    "0000000110000000",
+    "0000000000000000"
+  ];
+  for(let y=0;y<16;y++) for(let x=0;x<16;x++){
+    if(H[y][x]==="1"){ c.fillStyle="#ff4d6d"; c.fillRect(x,y,1,1); }
+  }
+}
+function drawDemoDither(){
+  const cv = $("demoDither");
+  if(!cv) return;
+  cv.width = 16; cv.height = 16;
+  const c = cv.getContext("2d");
+  for(let y=0;y<16;y++) for(let x=0;x<16;x++){
+    const col = (x + y) % 2 === 0 ? "#0f0f0f" : "#f0f0f0";
+    c.fillStyle = col; c.fillRect(x,y,1,1);
+  }
+}
+
+/* ============ 初始化 ============ */
+function init(){
+  canvas = $("gridCanvas");
+  ctx = canvas.getContext("2d", { willReadFrequently: true });
+  canvas.width = state.w; canvas.height = state.h;
+  bindCanvasEvents();
+  bindUI();
+  resizeCanvas(state.w, state.h);
+  renderPalette();
+  $("colorHex").textContent = state.curColor;
+  updateStageSize(); updateHUD();
+  // 首次加载自动打开教程（新手引导）
+  openTutorial();
+}
+init();
+</script>
+</body>
+</html>
