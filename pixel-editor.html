@@ -297,15 +297,15 @@
       <p>打开「洋葱皮」可看到<b>前后帧半透明叠影</b>，照着上一帧位置画下一帧，动画更连贯（透明度可调）。</p>
       <h3>8️⃣ 对称绘制（Phase 2）</h3>
       <p>左栏「对称」开<b>水平镜像</b>，画一笔左右同时出现 —— 画脸、画翅膀神器；<b>四向镜像</b>一下出四个方向。</p>
-      <h3>🔟 选区工具（Phase 3）</h3>
+      <h3>9️⃣ 选区工具（Phase 3）</h3>
       <p>左栏选 <b>✂️ 选区</b>，在画布上<b>拖动框选</b>一个方块；框选后可在框内<b>按住拖动移动</b>整块内容（原位变透明），或点按钮<b>水平翻转 / 垂直翻转 / 旋转 90°</b>。</p>
       <ul>
         <li><span class="shortcut">Ctrl+C 复制</span> → <span class="shortcut">Ctrl+V 粘贴</span>，粘贴的是<b>浮动层</b>，鼠标点哪就贴哪</li>
         <li><span class="shortcut">Esc</span> 取消选区</li>
       </ul>
-      <h3>1️⃣1️⃣ 形状工具（Phase 3）</h3>
+      <h3>1️⃣0️⃣ 形状工具（Phase 3）</h3>
       <p>左栏 <b>⬜ 矩形</b> 或 <b>⬭ 椭圆</b>：点起点拖到终点松开。默认<b>空心</b>边框，勾选「实心」变填充块。</p>
-      <h3>1️⃣2️⃣ 自动保存</h3>
+      <h3>1️⃣1️⃣ 自动保存</h3>
       <p>内容会<span class="shortcut">自动保存</span>到浏览器本地，关掉页面再打开，上次画的还在，不怕丢。</p>
     </div>
     <div class="modal-foot"><button class="px-btn primary" id="btnCloseTutorial2">开始画画 🚀</button></div>
@@ -1466,7 +1466,7 @@ function transformSelection(kind){
       if(kind === "flipH"){ sx = w-1-x; sy = y; }
       else if(kind === "flipV"){ sx = x; sy = h-1-y; }
       else if(kind === "rotate"){
-        // 顺时针 90°：输出 (x,y) ← 源 (y, h-1-x)（h = 源高）
+        // 顺时针 90°：输出 (x,y) ← 源 (y, h-1-x)，输出宽高互换（sy 用源高 h）
         sx = y; sy = h-1-x;
       }
       if(sx<0||sx>=w||sy<0||sy>=h){ continue; }
