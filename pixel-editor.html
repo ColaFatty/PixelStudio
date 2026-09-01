@@ -68,6 +68,7 @@
   #gridCanvas{display:block; image-rendering:pixelated; image-rendering:crisp-edges; position:relative; z-index:3; cursor:crosshair; touch-action:none;}
   #checker{position:absolute; inset:0; z-index:0; background:repeating-conic-gradient(#3a3a42 0% 25%, #26262c 0% 50%); background-size:16px 16px;}
   #onionLayer{position:absolute; inset:0; z-index:1; pointer-events:none; image-rendering:pixelated;}
+  #refLayer{position:absolute; inset:0; z-index:2; pointer-events:none; background-size:100% 100%; background-position:center; background-repeat:no-repeat; display:none; image-rendering:auto;}
   #gridlines{position:absolute; inset:0; z-index:2; pointer-events:none;}
   #selectLayer{position:absolute; inset:0; z-index:4; pointer-events:none; display:none;}
   #selectLayer .marquee{position:absolute; border:2px dashed var(--accent2); box-shadow:0 0 0 1px rgba(0,0,0,.6) inset, 0 0 0 9999px rgba(0,0,0,.25);}
@@ -150,6 +151,13 @@
       <div class="side-title">🛠️ 笔刷</div>
       <label class="mini-label">大小 <b id="brushSizeVal">1</b></label>
       <input type="range" id="brushSize" min="1" max="16" value="1" style="width:100%">
+      <div class="row" style="margin-top:6px">
+        <span class="mini-label" style="margin:0">形状</span>
+        <select id="brushShape" style="flex:1">
+          <option value="square">方形</option>
+          <option value="circle">圆形</option>
+        </select>
+      </div>
     </div>
     <div class="side-group">
       <div class="side-title">📐 画布尺寸</div>
@@ -208,6 +216,7 @@
       <div id="canvasStage">
         <div id="checker"></div>
         <div id="onionLayer"></div>
+        <div id="refLayer"></div>
         <div id="gridlines"></div>
         <canvas id="gridCanvas"></canvas>
         <div id="selectLayer"></div>
@@ -235,6 +244,8 @@
         <select id="paletteSelect">
           <option value="pico8">PICO-8（16色）</option>
           <option value="gb">GameBoy（4色）</option>
+          <option value="sweetie16">Sweetie-16（16色）</option>
+          <option value="endesga32">Endesga-32（32色）</option>
           <option value="custom">我的调色板</option>
         </select>
         <button class="px-btn icon-only" id="btnAddColor" title="把当前颜色加入调色板">➕</button>
@@ -247,6 +258,28 @@
       <div class="row">
         <input type="color" id="colorPicker" value="#ffd166">
         <div id="colorHex" style="font-size:12px; font-family:ui-monospace,monospace; color:var(--dim);"></div>
+      </div>
+    </div>
+    <div class="side-group">
+      <div class="side-title">🖼️ 参考层</div>
+      <div class="row">
+        <button class="px-btn" id="btnRefImport" style="flex:1">📤 导入参考图</button>
+        <input type="file" id="refFileInput" accept="image/*" class="hidden">
+      </div>
+      <div id="refStatus" class="mini-label" style="margin-top:4px">未导入 — 导入图片垫底临摹</div>
+      <label class="switch" style="margin-top:6px"><input type="checkbox" id="refToggle" checked><span class="knob"></span>显示参考层</label>
+      <div class="row" style="margin-top:6px">
+        <span class="mini-label" style="margin:0">透明度</span>
+        <input type="range" id="refOpacity" min="10" max="90" value="45" style="flex:1">
+        <span class="mini-label" id="refOpacityVal" style="margin:0">45%</span>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <label class="mini-label" style="margin:0">缩放</label>
+        <input type="range" id="refScale" min="25" max="300" value="100" style="flex:1">
+        <span class="mini-label" id="refScaleVal" style="margin:0">100%</span>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button class="px-btn" id="btnRefRemove" style="flex:1; color:var(--danger)">🗑 移除参考层</button>
       </div>
     </div>
   </div>
@@ -1207,7 +1240,13 @@ const PICO8 = [ "#000000","#1D2B53","#7E2553","#008751","#AB5236","#5F574F",
   "#C2C3C7","#FFF1E8","#FF004D","#FFA300","#FFEC27","#00E436",
   "#29ADFF","#83769C","#FF77A8","#FFCCAA" ];
 const GB = [ "#0F380F","#306230","#8BAC0F","#9BBC0F" ];
-const PALETTES = { pico8: PICO8.slice(), gb: GB.slice() };
+const SWEETIE16 = [ "#1A1C2C","#5D275D","#B13E53","#EF7D57","#FFCD75","#A7F070","#38B764","#257179",
+  "#29366F","#3B5DC9","#41A6F6","#73EFF7","#F4F4F4","#94B0C2","#566C86","#333C57" ];
+const ENDESGA32 = [ "#BE4A2F","#D77643","#EAD4AA","#E4A672","#B86F50","#733E39","#3E2731","#A22633",
+  "#E43B44","#F77622","#FEAE34","#FEE761","#63C74D","#3E8948","#265C42","#193C3E",
+  "#124E89","#0099DB","#2CE8F5","#FFFFFF","#C0CBDC","#8B9BB4","#5A6988","#3A4466",
+  "#262B44","#181425","#FF0044","#68386C","#B55088","#F6757A","#E8B796","#C28569" ];
+const PALETTES = { pico8: PICO8.slice(), gb: GB.slice(), sweetie16: SWEETIE16.slice(), endesga32: ENDESGA32.slice() };
 
 /* ============ 状态 ============ */
 let state = {
@@ -1237,6 +1276,12 @@ let state = {
   clipMode: false,      // 粘贴浮动模式：显示 ghost 等待放置
   clipGhostX: 0, clipGhostY: 0,
   shapeFill: false,     // 形状实心/空心
+  brushShape: "square", // 笔尖形状 square | circle
+  // Phase 3 P1 参考层
+  refOn: false,         // 是否已导入参考图
+  refVisible: true,     // 显示开关
+  refOpacity: 0.45,     // 透明度
+  refScale: 1,          // 缩放比例
 };
 let canvas, ctx, cell = 10;
 let drawing = false, lastX = -1, lastY = -1, lineStart = null, startPX = -1, startPY = -1;
@@ -1285,6 +1330,7 @@ function resizeCanvas(w, h){
   syncCanvasFromFrame();
   updateFrameBar();
   renderOnion();
+  renderRefLayer();
   render();
 }
 function updateStageSize(){
@@ -1780,6 +1826,40 @@ function paintLine(x0,y0,x1,y1,color){
     if(e2<dx){ err+=dx; y0+=sy; }
   }
 }
+// 圆形笔刷 / 圆盘：以 (cx,cy) 为中心画直径 ≈ size 的实心圆（含边界 + 保底 1px）
+function drawDiscAt(cx,cy,size,color){
+  if(size<=1){ drawPixel(clamp(Math.round(cx),0,state.w-1), clamp(Math.round(cy),0,state.h-1), color); return; }
+  const r = (size-1)/2;
+  const x0 = Math.floor(cx-r), x1 = Math.ceil(cx+r);
+  const y0 = Math.floor(cy-r), y1 = Math.ceil(cy+r);
+  const r2 = r*r + 0.0001;
+  for(let y=y0;y<=y1;y++){
+    for(let x=x0;x<=x1;x++){
+      const dx = x-cx, dy = y-cy;
+      if(dx*dx+dy*dy <= r2) drawPixel(clamp(x,0,state.w-1), clamp(y,0,state.h-1), color);
+    }
+  }
+}
+// 对单个像素坐标用当前笔尖形状落笔（方形方块 / 圆形圆盘）
+function drawWithBrush(x,y,color){
+  const b = state.brush;
+  if(b<=1){ drawPixel(clamp(x,0,state.w-1), clamp(y,0,state.h-1), color); return; }
+  if(state.brushShape==="circle"){ drawDiscAt(x,y,b,color); return; }
+  const off = Math.floor(b/2);
+  for(let dy=0; dy<b; dy++) for(let dx=0; dx<b; dx++){
+    drawPixel(clamp(x+dx-off,0,state.w-1), clamp(y+dy-off,0,state.h-1), color);
+  }
+}
+// 沿线段用当前笔尖形状连续落笔（粗线）
+function brushLine(x0,y0,x1,y1,color){
+  if(state.brush<=1){ paintLine(x0,y0,x1,y1,color); return; }
+  const steps = Math.max(Math.abs(x1-x0), Math.abs(y1-y0), 1);
+  for(let i=0;i<=steps;i++){
+    const tx = Math.round(x0 + (x1-x0)*i/steps);
+    const ty = Math.round(y0 + (y1-y0)*i/steps);
+    drawWithBrush(tx,ty,color);
+  }
+}
 function onDown(e){
   e.preventDefault();
   // 取色立即生效
@@ -1837,14 +1917,7 @@ function onDown(e){
 }
 function applyToolAt(x,y,color){
   if(state.tool==="pen" || state.tool==="eraser"){
-    const b = state.brush;
-    if(b<=1){ drawPixel(x,y,color); }
-    else {
-      const off = Math.floor(b/2);
-      for(let dy=0; dy<b; dy++) for(let dx=0; dx<b; dx++){
-        drawPixel(clamp(x+dx-off,0,state.w-1), clamp(y+dy-off,0,state.h-1), color);
-      }
-    }
+    drawWithBrush(x,y,color);
   } else if(state.tool==="fill"){
     floodFill(x,y,color);
     // 对称填充：对每个镜像点分别填充
@@ -1893,19 +1966,7 @@ function onMove(e){
     return;
   }
   // 增量画「上次→当前」这一段，不恢复基线（恢复会擦掉已画的轨迹）
-  const b = state.brush;
-  if(b<=1) paintLine(lastX,lastY,p.x,p.y,strokeColor());
-  else {
-    const steps = Math.max(Math.abs(p.x-lastX), Math.abs(p.y-lastY));
-    for(let i=1;i<=steps;i++){
-      const tx = Math.round(lastX + (p.x-lastX)*i/steps);
-      const ty = Math.round(lastY + (p.y-lastY)*i/steps);
-      const off = Math.floor(b/2);
-      for(let dy=0; dy<b; dy++) for(let dx=0; dx<b; dx++){
-        drawPixel(clamp(tx+dx-off,0,state.w-1), clamp(ty+dy-off,0,state.h-1), strokeColor());
-      }
-    }
-  }
+  brushLine(lastX,lastY,p.x,p.y,strokeColor());
   lastX = p.x; lastY = p.y;
 }
 function shapePreview(p){
@@ -2282,6 +2343,52 @@ function restoreDraft(){
   return loadDraft();
 }
 
+/* ============ 参考层（Phase 3 P1） ============ */
+function renderRefLayer(){
+  const layer = $("refLayer");
+  if(!state.refOn || !state.refVisible){
+    layer.style.display = "none";
+    return;
+  }
+  const img = state.refImage;
+  if(!img) return;
+  layer.style.display = "block";
+  layer.style.opacity = state.refOpacity;
+  layer.style.backgroundImage = "url(" + img.src + ")";
+  // 缩放：参考图在画布内等比缩放（含 scale 倍率）；100% = 原图等比铺满画布
+  const scale = state.refScale;
+  const cw = state.w * cell, ch = state.h * cell;
+  const fit = Math.min(cw / img.naturalWidth, ch / img.naturalHeight);
+  const w = Math.round(img.naturalWidth * fit * scale);
+  const h = Math.round(img.naturalHeight * fit * scale);
+  layer.style.backgroundSize = w + "px " + h + "px";
+}
+function loadRefImage(file){
+  if(!file || !file.type.match(/^image\//)) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const img = new Image();
+    img.onload = function(){
+      state.refOn = true;
+      state.refVisible = true;
+      state.refImage = img;
+      $("refToggle").checked = true;
+      $("refStatus").textContent = "已导入：" + (img.naturalWidth) + "×" + (img.naturalHeight) + "px";
+      renderRefLayer();
+    };
+    img.onerror = function(){ alert("参考图读取失败，请换一张试试"); };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function removeRefLayer(){
+  state.refOn = false;
+  state.refImage = null;
+  $("refToggle").checked = false;
+  $("refStatus").textContent = "未导入 — 导入图片垫底临摹";
+  renderRefLayer();
+}
+
 /* ============ 调色板 UI ============ */
 function currentPalette(){
   if(state.paletteType === "custom") return state.customPalette.slice();
@@ -2291,6 +2398,8 @@ function renderPalette(){
   const grid = $("paletteGrid");
   grid.innerHTML = "";
   const pal = currentPalette();
+  // 32 色用 8 列，其余 4 列（避免右栏过长）
+  grid.style.gridTemplateColumns = pal.length > 20 ? "repeat(8,1fr)" : "repeat(4,1fr)";
   pal.forEach(function(c, i){
     const sw = document.createElement("button");
     sw.className = "swatch" + (i===state.selectedSwatch ? " sel" : "");
@@ -2347,6 +2456,9 @@ function bindUI(){
     state.brush = parseInt(this.value,10);
     $("brushSizeVal").textContent = state.brush;
   });
+  $("brushShape").addEventListener("change", function(){
+    state.brushShape = this.value;
+  });
   // 网格
   $("gridToggle").addEventListener("change", function(){
     state.gridOn = this.checked;
@@ -2402,6 +2514,27 @@ function bindUI(){
     if(this.files && this.files[0]) handleImageFile(this.files[0]);
     this.value = "";
   });
+  // 参考层
+  $("btnRefImport").addEventListener("click", function(){ $("refFileInput").click(); });
+  $("refFileInput").addEventListener("change", function(){
+    if(this.files && this.files[0]) loadRefImage(this.files[0]);
+    this.value = "";
+  });
+  $("refToggle").addEventListener("change", function(){
+    state.refVisible = this.checked;
+    renderRefLayer();
+  });
+  $("refOpacity").addEventListener("input", function(){
+    state.refOpacity = parseInt(this.value,10)/100;
+    $("refOpacityVal").textContent = this.value + "%";
+    renderRefLayer();
+  });
+  $("refScale").addEventListener("input", function(){
+    state.refScale = parseInt(this.value,10)/100;
+    $("refScaleVal").textContent = this.value + "%";
+    renderRefLayer();
+  });
+  $("btnRefRemove").addEventListener("click", removeRefLayer);
   $("btnCloseImport").addEventListener("click", closeImportModal);
   $("btnApplyImport").addEventListener("click", applyImport);
   $("importUsePalette").addEventListener("change", function(){
