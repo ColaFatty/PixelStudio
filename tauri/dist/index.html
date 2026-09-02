@@ -131,6 +131,8 @@
   <button class="px-btn" id="btnUndo" title="撤销 (Ctrl+Z)">↩️ 撤销</button>
   <button class="px-btn" id="btnRedo" title="重做 (Ctrl+Y)">↪️ 重做</button>
   <div class="sep"></div>
+  <button class="px-btn" id="btnNewCanvas" title="新建画布：清空所有帧和历史">🆕 新画布</button>
+  <div class="sep"></div>
   <button class="px-btn primary" id="btnImport">🖼️ 导入图片→像素画</button>
   <button class="px-btn" id="btnTemplates" title="素材模板库：一键载入精灵/Tile/行走图">🧩 素材</button>
   <button class="px-btn" id="btnExport" title="导出 PNG">💾 导出 PNG</button>
@@ -299,6 +301,25 @@
 <div id="statusbar">
   <div>🖱️ <span id="cursorPos">—</span></div>
   <div>💾 撤销 <b id="undoCount">0</b> · 重做 <b id="redoCount">0</b></div>
+</div>
+
+<!-- 新画布确认弹窗 -->
+<div class="modal-mask hidden" id="newCanvasModal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-head"><h2>🆕 新建画布</h2><button class="close-x" id="btnCloseNewCanvas" title="取消">✕</button></div>
+    <div class="modal-body">
+      <p style="margin-top:0">清空所有帧和撤销历史，开始一张全新空白画布。</p>
+      <div class="side-title" style="margin:6px 0 8px">选择尺寸</div>
+      <div class="row" style="flex-wrap:wrap; gap:8px">
+        <button class="px-btn nc-size" data-size="16">16 × 16</button>
+        <button class="px-btn nc-size" data-size="32">32 × 32</button>
+        <button class="px-btn nc-size" data-size="48">48 × 48</button>
+        <button class="px-btn nc-size" data-size="64" style="background:var(--accent); color:#1b1b1f">64 × 64</button>
+        <button class="px-btn nc-size" data-size="custom" title="自定义宽高">自定义…</button>
+      </div>
+      <p class="mini-label" style="margin-top:10px">当前画布内容将被清空，且不可撤销。建议先导出 PNG/GIF 保存。</p>
+    </div>
+  </div>
 </div>
 
 <!-- 素材模板库弹窗 -->
@@ -2720,6 +2741,19 @@ function removeRefLayer(){
 }
 
 /* ============ 调色板 UI ============ */
+function addColorToPalette(){
+  const c = state.curColor;
+  if(state.paletteType==="custom"){
+    if(!state.customPalette.includes(c)) state.customPalette.push(c);
+  } else {
+    state.customPalette = currentPalette().concat([c]);
+    state.paletteType = "custom";
+    const ps = $("paletteSelect");
+    if(ps) ps.value = "custom";
+  }
+  state.selectedSwatch = state.customPalette.length-1;
+  renderPalette();
+}
 function currentPalette(){
   if(state.paletteType === "custom") return state.customPalette.slice();
   return PALETTES[state.paletteType];
@@ -2750,18 +2784,7 @@ function renderPalette(){
   add.className = "swatch add";
   add.textContent = "+";
   add.title = "把当前颜色加入调色板";
-  add.addEventListener("click", function(){
-    const c = state.curColor;
-    if(state.paletteType==="custom"){
-      if(!state.customPalette.includes(c)) state.customPalette.push(c);
-    } else {
-      state.customPalette = currentPalette().concat([c]);
-      state.paletteType = "custom";
-      $("paletteSelect").value = "custom";
-    }
-    state.selectedSwatch = state.customPalette.length-1;
-    renderPalette();
-  });
+  add.addEventListener("click", addColorToPalette);
   grid.appendChild(add);
   // 当为 custom 时显示删除按钮
   $("btnDelColor").style.display = state.paletteType==="custom" ? "" : "none";
@@ -2831,6 +2854,8 @@ function bindUI(){
     if(state.selectedSwatch >= state.customPalette.length) state.selectedSwatch = state.customPalette.length-1;
     renderPalette();
   });
+  // 顶栏 ➕ 加入调色板（同一逻辑：加当前色 + 切 custom 模式）
+  $("btnAddColor").addEventListener("click", addColorToPalette);
   // 撤销/重做
   $("btnUndo").addEventListener("click", undo);
   $("btnRedo").addEventListener("click", redo);
@@ -2847,6 +2872,16 @@ function bindUI(){
   // 素材模板库
   $("btnTemplates").addEventListener("click", openTemplateModal);
   $("btnCloseTpl").addEventListener("click", function(){ $("templateModal").classList.add("hidden"); });
+  // 新画布
+  $("btnNewCanvas").addEventListener("click", openNewCanvasModal);
+  $("btnCloseNewCanvas").addEventListener("click", closeNewCanvasModal);
+  document.querySelectorAll(".nc-size").forEach(function(btn){
+    btn.addEventListener("click", function(){ doNewCanvas(btn.dataset.size); });
+  });
+  // 点击遮罩关闭新画布弹窗（防误触丢内容：仅在弹窗边框外点击关闭）
+  $("newCanvasModal").addEventListener("click", function(e){
+    if(e.target === this) closeNewCanvasModal();
+  });
   bindTplTabs();
   // 参考层
   $("btnRefImport").addEventListener("click", function(){ $("refFileInput").click(); });
@@ -3209,6 +3244,41 @@ function makeTplCard(name, item, category){
     else if(category === "walker"){ loadWalkerTemplate(); }
   });
   return card;
+}
+function openNewCanvasModal(){
+  $("newCanvasModal").classList.remove("hidden");
+}
+function closeNewCanvasModal(){
+  $("newCanvasModal").classList.add("hidden");
+}
+function doNewCanvas(size){
+  let w, h;
+  if(size === "custom"){
+    const wv = prompt("画布宽度（1-256）：","64");
+    const hv = prompt("画布高度（1-256）：","64");
+    w = parseInt(wv,10); h = parseInt(hv,10);
+    if(!(w>=1 && w<=256 && h>=1 && h<=256)){
+      closeNewCanvasModal();
+      return;
+    }
+  } else {
+    w = h = parseInt(size,10);
+  }
+  // 清空：新帧（全透明）→ 清空撤销历史 → 恢复默认调色板 → 重置画布
+  state.frames = [];
+  state.frameIdx = 0;
+  state.undoStack = []; state.redoStack = [];
+  state.paletteType = "pico8";
+  state.customPalette = [];
+  state.selectedSwatch = -1;
+  state.curColor = "#ffd166";
+  const ps = $("paletteSelect");
+  if(ps) ps.value = "pico8";
+  resizeCanvas(w, h);   // frames 为空 → else 分支新建透明帧 + 清历史
+  renderPalette();
+  $("colorPicker").value = state.curColor;
+  $("colorHex").textContent = state.curColor;
+  closeNewCanvasModal();
 }
 function openTemplateModal(){
   $("templateModal").classList.remove("hidden");
