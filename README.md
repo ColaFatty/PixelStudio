@@ -51,7 +51,7 @@ npm run build
 
 ## 🗂️ 文件清单
 
-- `pixel-editor.html` — 主程序（单文件，~132KB）
+- `pixel-editor.html` — 主程序（单文件，~165KB）
 - `dist/` — 各版本交付包（zip + README + 使用方法）
 - `tauri/` — Tauri 桌面壳工程（含打包指南）
 
