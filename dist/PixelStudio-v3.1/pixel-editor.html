@@ -126,8 +126,6 @@
   <button class="px-btn primary" id="btnImport">🖼️ 导入图片→像素画</button>
   <button class="px-btn" id="btnExport" title="导出 PNG">💾 导出 PNG</button>
   <button class="px-btn" id="btnExportGIF" title="导出 GIF 动画">🎞️ 导出 GIF</button>
-  <button class="px-btn" id="btnExportSprite" title="导出 Sprite sheet（雪碧图）">🧵 Sprite sheet</button>
-  <button class="px-btn" id="btnExportAscii" title="导出字符画">🔤 字符画</button>
   <input type="file" id="fileInput" accept="image/*" class="hidden">
   <div style="flex:1"></div>
   <div id="sizeInfo"></div>
@@ -342,10 +340,6 @@
       <p>左栏 <b>⬜ 矩形</b> 或 <b>⬭ 椭圆</b>：点起点拖到终点松开。默认<b>空心</b>边框，勾选「实心」变填充块。</p>
       <h3>1️⃣1️⃣ 自动保存</h3>
       <p>内容会<span class="shortcut">自动保存</span>到浏览器本地，关掉页面再打开，上次画的还在，不怕丢。</p>
-      <h3>1️⃣2️⃣ Sprite sheet（Phase 3 P2）</h3>
-      <p>动画多帧可以导出成<b>一张雪碧图</b>：帧按网格排好，游戏引擎（或 CSS 动画）一张图就能引用所有动作帧。可调<b>列数 / 放大倍数 / 间距 / 背景</b>，弹窗里实时预览。</p>
-      <h3>1️⃣3️⃣ 字符画（Phase 3 P2）</h3>
-      <p>把当前帧按<b>亮度</b>转成字符画：越亮的地方用越重的字符（比如 <code>#</code>），越暗越用点（比如 <code>.</code>）。可选经典 / 色块 / 二值字符集，支持<b>复制到剪贴板</b>或<b>下载 txt</b>。</p>
     </div>
     <div class="modal-foot"><button class="px-btn primary" id="btnCloseTutorial2">开始画画 🚀</button></div>
   </div>
@@ -419,99 +413,6 @@
       <p style="font-size:12px;color:var(--dim)">循坏播放根据侧栏「循环播放」开关；关闭则单次播放。</p>
     </div>
     <div class="modal-foot"><button class="px-btn primary" id="btnDoGifExport">保存 GIF 🎬</button></div>
-  </div>
-</div>
-<!-- Sprite sheet 导出弹窗（Phase 3 P2） -->
-<div class="modal-mask hidden" id="spriteModal">
-  <div class="modal" style="max-width:420px">
-    <div class="modal-head"><h2>🧵 导出 Sprite sheet</h2><button class="close-x" id="btnCloseSprite">✕</button></div>
-    <div class="modal-body">
-      <p style="font-size:12px;color:var(--dim);margin-bottom:12px">把 <b id="spriteFrameCount"></b> 帧按网格排列成一张雪碧图（游戏素材常用）。</p>
-      <div class="row">
-        <label class="mini-label" style="margin:0">排列</label>
-        <select id="spriteColumns">
-          <option value="0" selected>自动（按帧数）</option>
-          <option value="1">1 列</option>
-          <option value="2">2 列</option>
-          <option value="3">3 列</option>
-          <option value="4">4 列</option>
-          <option value="6">6 列</option>
-          <option value="8">8 列</option>
-        </select>
-      </div>
-      <div class="row">
-        <label class="mini-label" style="margin:0">放大倍数</label>
-        <select id="spriteScale">
-          <option value="1">1x（原始大小）</option>
-          <option value="2" selected>2x</option>
-          <option value="4">4x</option>
-          <option value="8">8x</option>
-        </select>
-      </div>
-      <div class="row">
-        <label class="mini-label" style="margin:0">间距</label>
-        <select id="spriteGap">
-          <option value="0" selected>0（紧贴）</option>
-          <option value="1">1 px</option>
-          <option value="2">2 px</option>
-          <option value="4">4 px</option>
-        </select>
-      </div>
-      <div class="row">
-        <label class="mini-label" style="margin:0">背景</label>
-        <select id="spriteBg">
-          <option value="transparent" selected>透明</option>
-          <option value="black">黑色</option>
-          <option value="white">白色</option>
-          <option value="checker">棋盘格</option>
-        </select>
-      </div>
-      <p id="spriteSizeInfo" style="font-size:12px;color:var(--dim)"></p>
-      <div style="margin-top:10px; text-align:center">
-        <canvas id="spritePreview" style="max-width:100%; image-rendering:pixelated; border:1px solid var(--line); background:repeating-conic-gradient(#ffffff14 0% 25%, transparent 0% 50%) 50% / 12px 12px;"></canvas>
-      </div>
-    </div>
-    <div class="modal-foot"><button class="px-btn primary" id="btnDoSprite">保存 Sprite sheet 🧵</button></div>
-  </div>
-</div>
-<!-- 字符画导出弹窗（Phase 3 P2） -->
-<div class="modal-mask hidden" id="asciiModal">
-  <div class="modal" style="max-width:520px">
-    <div class="modal-head"><h2>🔤 导出字符画</h2><button class="close-x" id="btnCloseAscii">✕</button></div>
-    <div class="modal-body">
-      <p style="font-size:12px;color:var(--dim);margin-bottom:12px">按像素亮度映射成字符，纯文本可粘贴到博客 / 代码注释。</p>
-      <div class="row">
-        <label class="mini-label" style="margin:0">字符集</label>
-        <select id="asciiCharset">
-          <option value="classic">#@%*+=-:. （经典）</option>
-          <option value="block">█▓▒░ （色块）</option>
-          <option value="binary">1010 （二值）</option>
-          <option value="shade">@%#*+=-:. （紧凑）</option>
-        </select>
-      </div>
-      <div class="row">
-        <label class="mini-label" style="margin:0">缩放</label>
-        <select id="asciiScale">
-          <option value="1" selected>1x（每像素一个字符）</option>
-          <option value="2">2x（2×2 像素一个字符）</option>
-          <option value="4">4x（4×4 像素一个字符）</option>
-        </select>
-      </div>
-      <div class="row">
-        <label class="mini-label" style="margin:0">前景</label>
-        <input type="color" id="asciiFg" value="#ffffff" style="width:44px;height:28px;border:1px solid var(--line);background:transparent">
-        <label class="mini-label" style="margin:0; margin-left:10px">背景</label>
-        <input type="color" id="asciiBg" value="#000000" style="width:44px;height:28px;border:1px solid var(--line);background:transparent">
-      </div>
-      <div id="asciiPreviewWrap" style="margin-top:10px; max-height:220px; overflow:auto; border:1px solid var(--line); padding:8px; background:#0c0c10;">
-        <pre id="asciiPreview" style="margin:0; font-family:ui-monospace,Consolas,monospace; font-size:10px; line-height:1.2; color:#fff;"></pre>
-      </div>
-    </div>
-    <div class="modal-foot">
-      <button class="px-btn" id="btnAsciiCopy">📋 复制</button>
-      <button class="px-btn" id="btnAsciiDownload">⬇️ 下载 txt</button>
-      <button class="px-btn primary" id="btnCloseAscii">完成 ✔</button>
-    </div>
   </div>
 </div>
 <script>
@@ -2331,146 +2232,6 @@ function exportGIF(){
   a.href = "data:image/gif;base64," + b64;
   a.click();
 }
-
-/* ============ 导出 Sprite sheet（Phase 3 P2） ============ */
-function openSpriteModal(){
-  syncFrameFromCanvas();
-  $("spriteFrameCount").textContent = state.frames.length;
-  $("spriteModal").classList.remove("hidden");
-  renderSpritePreview();
-}
-function renderSpritePreview(){
-  const n = state.frames.length;
-  const base = renderSpriteCanvas(n, true); // 1x 预览（不放大，预览 canvas 用 CSS 控制大小）
-  const pv = $("spritePreview");
-  pv.width = base.width; pv.height = base.height;
-  pv.getContext("2d").drawImage(base, 0, 0);
-}
-function renderSpriteCanvas(forceCols, forPreview){
-  // 计算列数
-  const n = state.frames.length;
-  let cols = parseInt($("spriteColumns").value,10);
-  if(!cols || cols < 1) cols = Math.ceil(Math.sqrt(n));
-  cols = Math.max(1, Math.min(cols, n));
-  const rows = Math.ceil(n / cols);
-  const scale = parseInt($("spriteScale").value,10) || 1;
-  const gap = parseInt($("spriteGap").value,10) || 0;
-  const bg = $("spriteBg").value;
-  const cellW = state.w * scale, cellH = state.h * scale;
-  const W = cols * cellW + (cols-1)*gap;
-  const H = rows * cellH + (rows-1)*gap;
-  // 预览固定 1x，不放大
-  const effScale = forPreview ? 1 : scale;
-  const effCellW = state.w * effScale, effCellH = state.h * effScale;
-  const effGap = forPreview ? Math.min(gap, 4) : gap;
-  const effW = cols * effCellW + (cols-1)*effGap;
-  const effH = rows * effCellH + (rows-1)*effGap;
-  const out = document.createElement("canvas");
-  out.width = effW; out.height = effH;
-  const oc = out.getContext("2d");
-  oc.imageSmoothingEnabled = false;
-  if(bg === "black"){ oc.fillStyle = "#000"; oc.fillRect(0,0,effW,effH); }
-  else if(bg === "white"){ oc.fillStyle = "#fff"; oc.fillRect(0,0,effW,effH); }
-  // transparent / checker 都保持透明背景（checker 只用于预览的 CSS 底）
-  state.frames.forEach(function(fr, i){
-    const col = i % cols, row = Math.floor(i / cols);
-    const dx = col * (effCellW + effGap), dy = row * (effCellH + effGap);
-    // 帧 ImageData -> 临时 canvas -> 近邻放大绘制
-    const tmp = document.createElement("canvas");
-    tmp.width = state.w; tmp.height = state.h;
-    tmp.getContext("2d").putImageData(fr, 0, 0);
-    oc.drawImage(tmp, 0,0, state.w, state.h, dx, dy, effCellW, effCellH);
-  });
-  $("spriteSizeInfo").textContent = "输出尺寸：" + effW + " × " + effH + " px · 网格 " + cols + " 列 × " + rows + " 行";
-  return out;
-}
-function exportSprite(){
-  const canvas = renderSpriteCanvas(parseInt($("spriteColumns").value,10), false);
-  const a = document.createElement("a");
-  a.download = "pixel-spritesheet-" + state.w + "x" + state.h + ".png";
-  a.href = canvas.toDataURL("image/png");
-  a.click();
-}
-
-/* ============ 导出字符画（Phase 3 P2） ============ */
-function openAsciiModal(){
-  syncFrameFromCanvas();
-  $("asciiModal").classList.remove("hidden");
-  renderAsciiPreview();
-}
-function renderAsciiPreview(){
-  const text = buildAscii();
-  const pv = $("asciiPreview");
-  pv.textContent = text;
-  pv.style.color = $("asciiFg").value;
-  pv.style.backgroundColor = $("asciiBg").value;
-}
-const ASCII_CHARSETS = {
-  classic: ["#","@","%","*","+","=","-",":","."],
-  block  : ["█","▓","▒","░"],
-  binary : ["1","0"],
-  shade  : ["@","%","#","*","+","=","-",":","."]
-};
-function buildAscii(){
-  // 使用当前帧（用户预览哪个帧就导哪个帧）
-  const fr = currentFrame();
-  if(!fr) return "";
-  const data = fr.data;
-  const charset = ASCII_CHARSETS[$("asciiCharset").value] || ASCII_CHARSETS.classic;
-  const scale = parseInt($("asciiScale").value,10) || 1;
-  const lines = [];
-  const stepX = scale, stepY = scale;
-  for(let y=0; y<state.h; y+=stepY){
-    let line = "";
-    for(let x=0; x<state.w; x+=stepX){
-      // 采样块亮度（取块内有内容像素的平均亮度，透明像素忽略 → 空格）
-      let sum = 0, opaque = 0;
-      for(let j=0; j<stepY && y+j<state.h; j++){
-        for(let i=0; i<stepX && x+i<state.w; i++){
-          const idx = ((y+j)*state.w + (x+i)) * 4;
-          const a = data[idx+3];
-          if(a === 0) continue;
-          sum += (0.299*data[idx] + 0.587*data[idx+1] + 0.114*data[idx+2]) * (a/255);
-          opaque += a/255;
-        }
-      }
-      if(opaque === 0){ line += " "; continue; }
-      const lum = sum / opaque;             // 0~255
-      // 亮度 -> 字符索引：越亮用越靠前的字符（高密度）
-      const idx = Math.floor((255 - lum) / 256 * charset.length);
-      line += charset[Math.max(0, Math.min(charset.length-1, idx))];
-    }
-    // 去掉行尾空白（保持文本整洁）
-    line = line.replace(/\s+$/, "");
-    if(line.length > 0) lines.push(line);
-  }
-  return lines.join("\n") + "\n";
-}
-function copyAscii(){
-  const text = buildAscii();
-  if(navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(text).then(function(){
-      $("cursorPos").textContent = "已复制字符画";
-    });
-  } else {
-    // fallback：老浏览器用 textarea 选中复制
-    const ta = document.createElement("textarea");
-    ta.value = text;
-    document.body.appendChild(ta);
-    ta.select();
-    try{ document.execCommand("copy"); $("cursorPos").textContent = "已复制字符画"; }catch(e){}
-    document.body.removeChild(ta);
-  }
-}
-function downloadAscii(){
-  const text = buildAscii();
-  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-  const a = document.createElement("a");
-  a.download = "pixel-art-" + state.w + "x" + state.h + ".txt";
-  a.href = URL.createObjectURL(blob);
-  a.click();
-  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 2000);
-}
 /* 播放预览 */
 let playTimer = null;
 function togglePlay(){
@@ -2802,26 +2563,6 @@ function bindUI(){
     exportGIF();
     $("gifModal").classList.add("hidden");
   });
-  // Sprite sheet 导出
-  $("btnExportSprite").addEventListener("click", openSpriteModal);
-  $("btnCloseSprite").addEventListener("click", function(){ $("spriteModal").classList.add("hidden"); });
-  $("spriteColumns").addEventListener("change", renderSpritePreview);
-  $("spriteScale").addEventListener("change", renderSpritePreview);
-  $("spriteGap").addEventListener("change", renderSpritePreview);
-  $("spriteBg").addEventListener("change", renderSpritePreview);
-  $("btnDoSprite").addEventListener("click", function(){
-    exportSprite();
-    $("spriteModal").classList.add("hidden");
-  });
-  // 字符画导出
-  $("btnExportAscii").addEventListener("click", openAsciiModal);
-  $("asciiCharset").addEventListener("change", renderAsciiPreview);
-  $("asciiScale").addEventListener("change", renderAsciiPreview);
-  $("asciiFg").addEventListener("input", renderAsciiPreview);
-  $("asciiBg").addEventListener("input", renderAsciiPreview);
-  $("btnAsciiCopy").addEventListener("click", copyAscii);
-  $("btnAsciiDownload").addEventListener("click", downloadAscii);
-  $("btnCloseAscii").addEventListener("click", function(){ $("asciiModal").classList.add("hidden"); });
   // 帧管理
   $("btnAddFrame").addEventListener("click", addFrame);
   $("btnDupFrame").addEventListener("click", dupFrame);
