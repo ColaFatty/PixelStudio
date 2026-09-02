@@ -2196,7 +2196,7 @@ function applyImport(){
   let finalColors;
   if(usePalette){
     // 映射到当前调色板：每个原始颜色找最近色板色
-    const pal = currentPalette();
+    const pal = currentPalette().map(hexToRgbArr);
     finalColors = colors.map(c => {
       let best = pal[0], bd = Infinity;
       for(const pc of pal){
