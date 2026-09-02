@@ -1,0 +1,3001 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>PixelStudio · 像素画编辑器</title>
+<style>
+  :root{
+    --bg:#1b1b1f; --panel:#26262c; --panel2:#2e2e36; --line:#3a3a44;
+    --text:#e8e8ea; --dim:#9a9aa5; --accent:#ffd166; --accent2:#5aa9e6;
+    --danger:#ef6e6e; --ok:#7ed6a0;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:"PingFang SC","Microsoft YaHei","Noto Sans CJK SC",system-ui,sans-serif;
+    display:flex; flex-direction:column; overflow:hidden;
+    -webkit-user-select:none; user-select:none;
+  }
+  button{font-family:inherit; color:inherit; background:none; border:none; cursor:pointer;}
+  button:focus{outline:none;}
+  .px-btn{
+    background:var(--panel2); border:2px solid var(--line);
+    box-shadow:0 3px 0 var(--line);
+    padding:6px 10px; font-size:13px; border-radius:2px;
+    display:inline-flex; align-items:center; gap:6px;
+    transition:transform .05s, box-shadow .05s;
+  }
+  .px-btn:hover{background:#383840;}
+  .px-btn:active{transform:translateY(3px); box-shadow:0 0 0 var(--line);}
+  .px-btn.active{background:var(--accent); color:#1b1b1f; border-color:var(--accent);}
+  .px-btn.primary{background:var(--accent); color:#1b1b1f; border-color:var(--accent);}
+  .px-btn.icon-only{width:34px;height:34px;padding:0;justify-content:center;font-size:17px;}
+  select, input[type=number]{
+    background:var(--panel2); color:var(--text); border:2px solid var(--line);
+    padding:5px 8px; font-size:13px; border-radius:2px; font-family:inherit;
+  }
+  input[type=number]{width:64px;}
+  select:focus,input:focus{outline:2px solid var(--accent2);}
+  input[type=color]{width:34px;height:34px;border:2px solid var(--line);border-radius:2px;background:none;padding:0;cursor:pointer;}
+  input[type=color]::-webkit-color-swatch-wrapper{padding:2px;}
+  input[type=color]::-webkit-color-swatch{border:none;}
+  .brand{font-size:16px; font-weight:800; letter-spacing:1px; display:flex; align-items:center; gap:8px; margin-right:4px;}
+  .brand b{color:var(--accent); text-shadow:2px 2px 0 #8f6a1f;}
+  .sep{width:2px; height:24px; background:var(--line);}
+  .tool-label{font-size:11px; color:var(--dim); margin-right:-4px;}
+  #sizeInfo{font-size:12px; color:var(--dim); font-family:ui-monospace,Menlo,Consolas,monospace; white-space:nowrap;}
+  #topbar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:8px 12px; background:var(--panel); border-bottom:3px solid var(--line);}
+  #main{flex:1; display:flex; min-height:0;}
+  #sidebar{width:150px; background:var(--panel); border-right:3px solid var(--line); padding:10px; overflow-y:auto; flex-shrink:0;}
+  .side-group{margin-bottom:14px;}
+  .side-title{font-size:11px; color:var(--dim); margin-bottom:6px; letter-spacing:1px;}
+  .tool-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:6px;}
+  .tool-grid .px-btn{flex-direction:column; font-size:12px; padding:8px 4px;}
+  .tool-grid .px-btn span:first-child{font-size:19px; line-height:1;}
+  .mini-label{font-size:12px; color:var(--dim); margin-bottom:4px; display:block;}
+  .row{display:flex; align-items:center; gap:6px; margin-bottom:8px;}
+  .switch{display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px;}
+  .switch input{display:none;}
+  .switch .knob{width:34px; height:20px; border-radius:12px; background:#44444e; position:relative; transition:background .15s; border:2px solid var(--line);}
+  .switch .knob::after{content:""; position:absolute; top:-1px; left:-1px; width:18px; height:18px; border-radius:50%; background:#ccc; transition:transform .15s;}
+  .switch input:checked + .knob{background:var(--accent);}
+  .switch input:checked + .knob::after{transform:translateX(14px); background:#1b1b1f;}
+  #brushSizeVal{font-family:ui-monospace,monospace; font-size:12px; color:var(--accent);}
+  #canvasWrap{flex:1; display:flex; align-items:center; justify-content:center; overflow:auto; position:relative; padding:24px; background:#141417;}
+  #canvasStage{position:relative; box-shadow:0 6px 30px rgba(0,0,0,.5); border:1px solid #000;}
+  #gridCanvas{display:block; image-rendering:pixelated; image-rendering:crisp-edges; position:relative; z-index:3; cursor:crosshair; touch-action:none;}
+  #checker{position:absolute; inset:0; z-index:0; background:repeating-conic-gradient(#3a3a42 0% 25%, #26262c 0% 50%); background-size:16px 16px;}
+  #onionLayer{position:absolute; inset:0; z-index:1; pointer-events:none; image-rendering:pixelated;}
+  #refLayer{position:absolute; inset:0; z-index:2; pointer-events:none; background-size:100% 100%; background-position:center; background-repeat:no-repeat; display:none; image-rendering:auto;}
+  #gridlines{position:absolute; inset:0; z-index:2; pointer-events:none;}
+  #selectLayer{position:absolute; inset:0; z-index:4; pointer-events:none; display:none;}
+  #selectLayer .marquee{position:absolute; border:2px dashed var(--accent2); box-shadow:0 0 0 1px rgba(0,0,0,.6) inset, 0 0 0 9999px rgba(0,0,0,.25);}
+  #selectLayer .ghost{position:absolute; image-rendering:pixelated; image-rendering:crisp-edges; opacity:.75; border:1px solid var(--accent);}
+  #frameBar{display:flex; align-items:center; gap:6px; padding:8px 12px; background:var(--panel); border-top:3px solid var(--line); flex-shrink:0;}
+  #frameStrip .frame-thumb{width:52px; height:52px; border:2px solid var(--line); background:#141417; display:flex; align-items:center; justify-content:center; cursor:pointer; position:relative; flex-shrink:0; border-radius:2px; padding:2px;}
+  #frameStrip .frame-thumb canvas{max-width:100%; max-height:100%; image-rendering:pixelated;}
+  #frameStrip .frame-thumb .frame-idx{position:absolute; top:2px; left:3px; font-size:10px; color:var(--dim); background:rgba(0,0,0,.6); padding:0 3px; border-radius:2px; z-index:2;}
+  #frameStrip .frame-thumb.active{border-color:var(--accent); box-shadow:0 0 0 2px rgba(255,209,102,.3);}
+  #frameStrip .frame-thumb:active{transform:translateY(1px);}
+  #rightbar{width:168px; background:var(--panel); border-left:3px solid var(--line); padding:10px; overflow-y:auto; flex-shrink:0;}
+  #paletteGrid{display:grid; grid-template-columns:repeat(4,1fr); gap:5px;}
+  .swatch{width:100%; aspect-ratio:1; border:2px solid #000; border-radius:2px; cursor:pointer; position:relative; transition:transform .05s;}
+  .swatch:hover{transform:scale(1.12); z-index:3;}
+  .swatch.sel{outline:2px solid #fff; outline-offset:1px;}
+  .swatch.add{border:2px dashed var(--line); display:flex; align-items:center; justify-content:center; color:var(--dim); font-size:18px; background:var(--panel2);}
+  #statusbar{padding:6px 12px; background:var(--panel); border-top:3px solid var(--line); display:flex; justify-content:space-between; font-size:12px; color:var(--dim); font-family:ui-monospace,Menlo,Consolas,monospace;}
+  #statusbar b{color:var(--text); font-weight:600;}
+  .modal-mask{position:fixed; inset:0; background:rgba(0,0,0,.72); z-index:100; display:flex; align-items:center; justify-content:center; padding:20px;}
+  .modal{background:var(--panel); border:3px solid var(--line); box-shadow:0 10px 40px #000; max-width:720px; width:100%; max-height:86vh; display:flex; flex-direction:column; border-radius:4px;}
+  .modal-head{padding:12px 16px; border-bottom:2px solid var(--line); display:flex; align-items:center; justify-content:space-between;}
+  .modal-head h2{font-size:17px; display:flex; align-items:center; gap:8px;}
+  .modal-body{padding:16px; overflow-y:auto; line-height:1.75; font-size:14px;}
+  .modal-body h3{font-size:15px; color:var(--accent); margin:16px 0 6px;}
+  .modal-body h3:first-child{margin-top:0;}
+  .modal-body p{margin-bottom:10px;}
+  .modal-body ul{margin:0 0 10px 20px;}
+  .modal-body li{margin-bottom:4px;}
+  .modal-body code{background:var(--panel2); padding:1px 6px; border-radius:2px; font-size:13px; color:var(--accent2);}
+  .modal-foot{padding:10px 16px; border-top:2px solid var(--line); display:flex; justify-content:flex-end; gap:8px;}
+  .demo-row{display:flex; gap:14px; align-items:center; margin:10px 0;}
+  .demo-box{width:52px; height:52px; image-rendering:pixelated; background:#141417; border:2px solid var(--line);}
+  .shortcut{display:inline-block; min-width:64px;}
+  .close-x{font-size:20px; color:var(--dim); padding:4px 8px;}
+  .close-x:hover{color:var(--text);}
+  .hidden{display:none!important;}
+  @media (max-width:760px){
+    #sidebar{width:118px; padding:8px;}
+    #rightbar{width:132px; padding:8px;}
+    .tool-grid{grid-template-columns:1fr;}
+    .brand span{display:none;}
+  }
+</style>
+</head>
+<body>
+<!-- 顶栏 -->
+<div id="topbar">
+  <div class="brand"><b>PixelStudio</b><span>像素画编辑器</span></div>
+  <div class="sep"></div>
+  <button class="px-btn" id="btnOpenTutorial" title="教程 (F1)">📖 教程</button>
+  <div class="sep"></div>
+  <button class="px-btn" id="btnUndo" title="撤销 (Ctrl+Z)">↩️ 撤销</button>
+  <button class="px-btn" id="btnRedo" title="重做 (Ctrl+Y)">↪️ 重做</button>
+  <div class="sep"></div>
+  <button class="px-btn primary" id="btnImport">🖼️ 导入图片→像素画</button>
+  <button class="px-btn" id="btnExport" title="导出 PNG">💾 导出 PNG</button>
+  <button class="px-btn" id="btnExportGIF" title="导出 GIF 动画">🎞️ 导出 GIF</button>
+  <button class="px-btn" id="btnExportSprite" title="导出 Sprite sheet（雪碧图）">🧵 Sprite sheet</button>
+  <button class="px-btn" id="btnExportAscii" title="导出字符画">🔤 字符画</button>
+  <input type="file" id="fileInput" accept="image/*" class="hidden">
+  <div style="flex:1"></div>
+  <div id="sizeInfo"></div>
+</div>
+
+<div id="main">
+  <!-- 左栏工具 -->
+  <div id="sidebar">
+    <div class="side-group">
+      <div class="side-title">✏️ 工具</div>
+      <div class="tool-grid">
+        <button class="px-btn active" data-tool="pen"><span>🖊️</span>画笔</button>
+        <button class="px-btn" data-tool="eraser"><span>🩷</span>橡皮</button>
+        <button class="px-btn" data-tool="fill"><span>🪣</span>填充</button>
+        <button class="px-btn" data-tool="picker"><span>💉</span>取色</button>
+        <button class="px-btn" data-tool="line"><span>📏</span>直线</button>
+        <button class="px-btn" data-tool="select"><span>✂️</span>选区</button>
+        <button class="px-btn" data-tool="rect"><span>🔲</span>矩形</button>
+        <button class="px-btn" data-tool="ellipse"><span>⭕</span>椭圆</button>
+      </div>
+    </div>
+    <div class="side-group">
+      <div class="side-title">🛠️ 笔刷</div>
+      <label class="mini-label">大小 <b id="brushSizeVal">1</b></label>
+      <input type="range" id="brushSize" min="1" max="16" value="1" style="width:100%">
+      <div class="row" style="margin-top:6px">
+        <span class="mini-label" style="margin:0">形状</span>
+        <select id="brushShape" style="flex:1">
+          <option value="square">方形</option>
+          <option value="circle">圆形</option>
+        </select>
+      </div>
+    </div>
+    <div class="side-group">
+      <div class="side-title">📐 画布尺寸</div>
+      <div class="row">
+        <select id="sizePreset">
+          <option value="64">64 × 64</option>
+          <option value="48">48 × 48</option>
+          <option value="32">32 × 32</option>
+          <option value="16">16 × 16</option>
+          <option value="custom">自定义…</option>
+        </select>
+      </div>
+      <label class="switch"><input type="checkbox" id="gridToggle" checked><span class="knob"></span>网格</label>
+    </div>
+    <div class="side-group" id="shapeGroup" style="display:none">
+      <div class="side-title">🔲/⭕ 形状模式</div>
+      <label class="switch"><input type="checkbox" id="shapeFill"><span class="knob"></span>实心填充</label>
+    </div>
+    <div class="side-group" id="selectGroup" style="display:none">
+      <div class="side-title">✂️ 选区操作</div>
+      <div class="row" style="flex-wrap:wrap">
+        <button class="px-btn" id="btnSelFlipH" title="水平翻转选中内容">↔️ 水平翻转</button>
+        <button class="px-btn" id="btnSelFlipV" title="垂直翻转选中内容">↕️ 垂直翻转</button>
+        <button class="px-btn" id="btnSelRotate" title="旋转 90°">🔄 旋转90°</button>
+        <button class="px-btn" id="btnSelCopy" title="复制选区 (Ctrl+C)">📋 复制</button>
+        <button class="px-btn" id="btnSelPaste" title="粘贴 (Ctrl+V)">📌 粘贴</button>
+        <button class="px-btn" id="btnSelClear" title="取消选区 (Esc)" style="color:var(--danger)">✕ 取消</button>
+      </div>
+      <div class="mini-label" style="margin-top:8px">提示：框选后可直接拖动移动；Ctrl+C 复制 / Ctrl+V 粘贴</div>
+    </div>
+    <div class="side-group">
+      <div class="side-title">🎞️ 动画</div>
+      <label class="switch"><input type="checkbox" id="onionToggle"><span class="knob"></span>洋葱皮</label>
+      <div class="row" style="margin-top:6px">
+        <span class="mini-label" style="margin:0">透明度</span>
+        <input type="range" id="onionOpacity" min="10" max="60" value="30" style="flex:1">
+      </div>
+      <label class="switch" style="margin-top:6px"><input type="checkbox" id="loopToggle" checked><span class="knob"></span>循环播放</label>
+    </div>
+    <div class="side-group">
+      <div class="side-title">🪞 对称</div>
+      <div class="row">
+        <select id="symmetrySelect" style="flex:1">
+          <option value="none">关</option>
+          <option value="h">水平镜像</option>
+          <option value="v">垂直镜像</option>
+          <option value="hv">四向镜像</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- 画布区 -->
+  <div id="centerCol" style="flex:1; display:flex; flex-direction:column; min-width:0;">
+    <div id="canvasWrap">
+      <div id="canvasStage">
+        <div id="checker"></div>
+        <div id="onionLayer"></div>
+        <div id="refLayer"></div>
+        <div id="gridlines"></div>
+        <canvas id="gridCanvas"></canvas>
+        <div id="selectLayer"></div>
+      </div>
+    </div>
+    <!-- 帧栏 -->
+    <div id="frameBar">
+      <button class="px-btn icon-only" id="btnAddFrame" title="新增帧">➕</button>
+      <button class="px-btn icon-only" id="btnDupFrame" title="复制当前帧">⧉</button>
+      <button class="px-btn icon-only" id="btnDelFrame" title="删除当前帧" style="color:var(--danger)">🗑</button>
+      <div class="sep"></div>
+      <button class="px-btn icon-only" id="btnPlay" title="播放/暂停">▶</button>
+      <div class="sep"></div>
+      <div id="frameStrip" style="display:flex; gap:6px; overflow-x:auto; flex:1; padding:2px;"></div>
+      <div class="sep"></div>
+      <div id="frameInfo" style="font-size:12px; color:var(--dim); white-space:nowrap; font-family:ui-monospace,monospace;"></div>
+    </div>
+  </div>
+
+  <!-- 右栏调色板 -->
+  <div id="rightbar">
+    <div class="side-group">
+      <div class="side-title">🎨 调色板</div>
+      <div class="row">
+        <select id="paletteSelect">
+          <option value="pico8">PICO-8（16色）</option>
+          <option value="gb">GameBoy（4色）</option>
+          <option value="sweetie16">Sweetie-16（16色）</option>
+          <option value="endesga32">Endesga-32（32色）</option>
+          <option value="custom">我的调色板</option>
+        </select>
+        <button class="px-btn icon-only" id="btnAddColor" title="把当前颜色加入调色板">➕</button>
+        <button class="px-btn icon-only" id="btnDelColor" title="删除选中色" style="color:var(--danger)">✖</button>
+      </div>
+      <div id="paletteGrid"></div>
+    </div>
+    <div class="side-group">
+      <div class="side-title">🖌️ 当前颜色</div>
+      <div class="row">
+        <input type="color" id="colorPicker" value="#ffd166">
+        <div id="colorHex" style="font-size:12px; font-family:ui-monospace,monospace; color:var(--dim);"></div>
+      </div>
+    </div>
+    <div class="side-group">
+      <div class="side-title">🖼️ 参考层</div>
+      <div class="row">
+        <button class="px-btn" id="btnRefImport" style="flex:1">📤 导入参考图</button>
+        <input type="file" id="refFileInput" accept="image/*" class="hidden">
+      </div>
+      <div id="refStatus" class="mini-label" style="margin-top:4px">未导入 — 导入图片垫底临摹</div>
+      <label class="switch" style="margin-top:6px"><input type="checkbox" id="refToggle" checked><span class="knob"></span>显示参考层</label>
+      <div class="row" style="margin-top:6px">
+        <span class="mini-label" style="margin:0">透明度</span>
+        <input type="range" id="refOpacity" min="10" max="90" value="45" style="flex:1">
+        <span class="mini-label" id="refOpacityVal" style="margin:0">45%</span>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <label class="mini-label" style="margin:0">缩放</label>
+        <input type="range" id="refScale" min="25" max="300" value="100" style="flex:1">
+        <span class="mini-label" id="refScaleVal" style="margin:0">100%</span>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button class="px-btn" id="btnRefRemove" style="flex:1; color:var(--danger)">🗑 移除参考层</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="statusbar">
+  <div>🖱️ <span id="cursorPos">—</span></div>
+  <div>💾 撤销 <b id="undoCount">0</b> · 重做 <b id="redoCount">0</b></div>
+</div>
+
+<!-- 教程弹窗 -->
+<div class="modal-mask hidden" id="tutorialModal">
+  <div class="modal">
+    <div class="modal-head"><h2>📖 像素画入门教程</h2><button class="close-x" id="btnCloseTutorial">✕</button></div>
+    <div class="modal-body">
+      <h3>1️⃣ 像素是什么？</h3>
+      <p>像素画（Pixel Art）就是 <b>一格一格</b> 画的画。每一格称为一个「像素」，放大看就是一个个小方块，缩小看就能组成生动的图像——这就是复古游戏的画面风格。</p>
+      <div class="demo-row">
+        <canvas class="demo-box" id="demoHeart"></canvas>
+        <span>像这样：16×16 的一颗小爱心 ❤️（图标是画出来的示例）</span>
+      </div>
+      <h3>2️⃣ 怎么画线？</h3>
+      <p>选 <b>画笔</b> 🖊️，点一下放一格，<b>按住拖动</b> 连续画线。用 <b>直线工具</b> 📏 点起点、拖到终点松开，画一条笔直的线。</p>
+      <h3>3️⃣ 怎么配色？</h3>
+      <p>右侧是<b>调色板</b>，点任意色块，它就是当前颜色。</p>
+      <ul>
+        <li><b>PICO-8</b>：复古掌机的经典 16 色，像素画圈公认好看</li>
+        <li><b>GameBoy</b>：4 色灰度，最纯粹的像素味道</li>
+        <li>想换颜色？用底部 🖌️ 颜色选择器，点 <code>➕</code> 加入你的调色板</li>
+      </ul>
+      <h3>4️⃣ 明暗与立体感</h3>
+      <p>同一种颜色分 3 层：<b>暗色</b>（阴影）→ <b>本色</b>（主体）→ <b>亮色</b>（高光）。比如球体左上亮、右下暗，一下就"鼓"起来了。</p>
+      <h3>5️⃣ 抖动（Dithering）技法</h3>
+      <p>两色交界处画<b>交替的小点</b>（⚪⚫⚪⚫），远处看会"混"出中间色。这是像素画做渐变、做透明感的核心技巧。</p>
+      <div class="demo-row">
+        <canvas class="demo-box" id="demoDither"></canvas>
+        <span>黑白点交替 = 看起来是灰色渐变</span>
+      </div>
+      <h3>6️⃣ 小技巧</h3>
+      <ul>
+        <li><span class="shortcut">🖼️ 导入</span>照片或图片，一键变像素画，再改细节</li>
+        <li><span class="shortcut">↩️ 撤销</span><code>Ctrl+Z</code> / <span class="shortcut">↪️ 重做</span><code>Ctrl+Y</code> 随便试错</li>
+        <li><span class="shortcut">💾 导出</span>PNG 选 4x / 8x，图片更大更清晰</li>
+        <li>先大轮廓 → 再上色 → 最后明暗，是最顺的画法</li>
+      </ul>
+      <h3>7️⃣ 做动画（Phase 2）</h3>
+      <p>画面底部是<b>帧栏</b>：➕ 加帧 / ⧉ 复制当前帧 / 🗑 删帧。每帧画不同动作，点 <b>▶</b> 播放，用 <b>🎞️ 导出 GIF</b> 生成动图。</p>
+      <p>打开「洋葱皮」可看到<b>前后帧半透明叠影</b>，照着上一帧位置画下一帧，动画更连贯（透明度可调）。</p>
+      <h3>8️⃣ 对称绘制（Phase 2）</h3>
+      <p>左栏「对称」开<b>水平镜像</b>，画一笔左右同时出现 —— 画脸、画翅膀神器；<b>四向镜像</b>一下出四个方向。</p>
+      <h3>9️⃣ 选区工具（Phase 3）</h3>
+      <p>左栏选 <b>✂️ 选区</b>，在画布上<b>拖动框选</b>一个方块；框选后可在框内<b>按住拖动移动</b>整块内容（原位变透明），或点按钮<b>水平翻转 / 垂直翻转 / 旋转 90°</b>。</p>
+      <ul>
+        <li><span class="shortcut">Ctrl+C 复制</span> → <span class="shortcut">Ctrl+V 粘贴</span>，粘贴的是<b>浮动层</b>，鼠标点哪就贴哪</li>
+        <li><span class="shortcut">Esc</span> 取消选区</li>
+      </ul>
+      <h3>1️⃣0️⃣ 形状工具（Phase 3）</h3>
+      <p>左栏 <b>⬜ 矩形</b> 或 <b>⬭ 椭圆</b>：点起点拖到终点松开。默认<b>空心</b>边框，勾选「实心」变填充块。</p>
+      <h3>1️⃣1️⃣ 自动保存</h3>
+      <p>内容会<span class="shortcut">自动保存</span>到浏览器本地，关掉页面再打开，上次画的还在，不怕丢。</p>
+      <h3>1️⃣2️⃣ Sprite sheet（Phase 3 P2）</h3>
+      <p>动画多帧可以导出成<b>一张雪碧图</b>：帧按网格排好，游戏引擎（或 CSS 动画）一张图就能引用所有动作帧。可调<b>列数 / 放大倍数 / 间距 / 背景</b>，弹窗里实时预览。</p>
+      <h3>1️⃣3️⃣ 字符画（Phase 3 P2）</h3>
+      <p>把当前帧按<b>亮度</b>转成字符画：越亮的地方用越重的字符（比如 <code>#</code>），越暗越用点（比如 <code>.</code>）。可选经典 / 色块 / 二值字符集，支持<b>复制到剪贴板</b>或<b>下载 txt</b>。</p>
+    </div>
+    <div class="modal-foot"><button class="px-btn primary" id="btnCloseTutorial2">开始画画 🚀</button></div>
+  </div>
+</div>
+
+<!-- 导入选项弹窗 -->
+<div class="modal-mask hidden" id="importModal">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-head"><h2>🖼️ 导入图片转像素画</h2><button class="close-x" id="btnCloseImport">✕</button></div>
+    <div class="modal-body">
+      <p>图片按比例缩小后<b>居中</b>画到当前画布（透明部分保留）。</p>
+      <div class="side-title">🎨 颜色模式</div>
+      <label class="switch" style="margin-bottom:10px"><input type="checkbox" id="importUsePalette" checked><span class="knob"></span>映射到当前调色板</label>
+      <div id="importColorCountRow" class="row">
+        <label class="mini-label" style="margin:0">颜色数</label>
+        <select id="importColorCount">
+          <option value="16">16</option>
+          <option value="32">32</option>
+          <option value="64">64</option>
+          <option value="128">128</option>
+        </select>
+      </div>
+      <p style="font-size:12px;color:var(--dim)">映射调色板 = 成品像素感更强；自定义颜色数 = 更接近原图渐变。</p>
+    </div>
+    <div class="modal-foot"><button class="px-btn primary" id="btnApplyImport">转换并导入 ✅</button></div>
+  </div>
+</div>
+
+<!-- 导出弹窗 -->
+<div class="modal-mask hidden" id="exportModal">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-head"><h2>💾 导出 PNG</h2><button class="close-x" id="btnCloseExport">✕</button></div>
+    <div class="modal-body">
+      <div class="row">
+        <label class="mini-label" style="margin:0">放大倍数</label>
+        <select id="exportScale">
+          <option value="1">1x（原始大小）</option>
+          <option value="2">2x</option>
+          <option value="4" selected>4x</option>
+          <option value="8">8x</option>
+        </select>
+      </div>
+      <p id="exportSizeInfo" style="font-size:12px;color:var(--dim)"></p>
+      <p style="font-size:12px;color:var(--dim)">导出无缩放的纯像素 PNG，放大后边缘依旧清晰。</p>
+    </div>
+    <div class="modal-foot"><button class="px-btn primary" id="btnDoExport">保存 PNG 💾</button></div>
+  </div>
+</div>
+<!-- GIF 导出弹窗 -->
+<div class="modal-mask hidden" id="gifModal">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-head"><h2>🎞️ 导出 GIF 动画</h2><button class="close-x" id="btnCloseGifExport">✕</button></div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:var(--dim);margin-bottom:12px">将 <b id="gifFrameCount"></b> 帧导出为 GIF 动画。</p>
+      <div class="row">
+        <label class="mini-label" style="margin:0">放大倍数</label>
+        <select id="exportGifScale">
+          <option value="1">1x（原始大小）</option>
+          <option value="2" selected>2x</option>
+          <option value="4">4x</option>
+        </select>
+      </div>
+      <div class="row">
+        <label class="mini-label" style="margin:0">帧间隔</label>
+        <select id="exportGifDelay">
+          <option value="80">快（0.08s）</option>
+          <option value="120" selected>中（0.12s）</option>
+          <option value="200">慢（0.2s）</option>
+        </select>
+      </div>
+      <p style="font-size:12px;color:var(--dim)">循坏播放根据侧栏「循环播放」开关；关闭则单次播放。</p>
+    </div>
+    <div class="modal-foot"><button class="px-btn primary" id="btnDoGifExport">保存 GIF 🎬</button></div>
+  </div>
+</div>
+<!-- Sprite sheet 导出弹窗（Phase 3 P2） -->
+<div class="modal-mask hidden" id="spriteModal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-head"><h2>🧵 导出 Sprite sheet</h2><button class="close-x" id="btnCloseSprite">✕</button></div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:var(--dim);margin-bottom:12px">把 <b id="spriteFrameCount"></b> 帧按网格排列成一张雪碧图（游戏素材常用）。</p>
+      <div class="row">
+        <label class="mini-label" style="margin:0">排列</label>
+        <select id="spriteColumns">
+          <option value="0" selected>自动（按帧数）</option>
+          <option value="1">1 列</option>
+          <option value="2">2 列</option>
+          <option value="3">3 列</option>
+          <option value="4">4 列</option>
+          <option value="6">6 列</option>
+          <option value="8">8 列</option>
+        </select>
+      </div>
+      <div class="row">
+        <label class="mini-label" style="margin:0">放大倍数</label>
+        <select id="spriteScale">
+          <option value="1">1x（原始大小）</option>
+          <option value="2" selected>2x</option>
+          <option value="4">4x</option>
+          <option value="8">8x</option>
+        </select>
+      </div>
+      <div class="row">
+        <label class="mini-label" style="margin:0">间距</label>
+        <select id="spriteGap">
+          <option value="0" selected>0（紧贴）</option>
+          <option value="1">1 px</option>
+          <option value="2">2 px</option>
+          <option value="4">4 px</option>
+        </select>
+      </div>
+      <div class="row">
+        <label class="mini-label" style="margin:0">背景</label>
+        <select id="spriteBg">
+          <option value="transparent" selected>透明</option>
+          <option value="black">黑色</option>
+          <option value="white">白色</option>
+          <option value="checker">棋盘格</option>
+        </select>
+      </div>
+      <p id="spriteSizeInfo" style="font-size:12px;color:var(--dim)"></p>
+      <div style="margin-top:10px; text-align:center">
+        <canvas id="spritePreview" style="max-width:100%; image-rendering:pixelated; border:1px solid var(--line); background:repeating-conic-gradient(#ffffff14 0% 25%, transparent 0% 50%) 50% / 12px 12px;"></canvas>
+      </div>
+    </div>
+    <div class="modal-foot"><button class="px-btn primary" id="btnDoSprite">保存 Sprite sheet 🧵</button></div>
+  </div>
+</div>
+<!-- 字符画导出弹窗（Phase 3 P2） -->
+<div class="modal-mask hidden" id="asciiModal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-head"><h2>🔤 导出字符画</h2><button class="close-x" id="btnCloseAscii">✕</button></div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:var(--dim);margin-bottom:12px">按像素亮度映射成字符，纯文本可粘贴到博客 / 代码注释。</p>
+      <div class="row">
+        <label class="mini-label" style="margin:0">字符集</label>
+        <select id="asciiCharset">
+          <option value="classic">#@%*+=-:. （经典）</option>
+          <option value="block">█▓▒░ （色块）</option>
+          <option value="binary">1010 （二值）</option>
+          <option value="shade">@%#*+=-:. （紧凑）</option>
+        </select>
+      </div>
+      <div class="row">
+        <label class="mini-label" style="margin:0">缩放</label>
+        <select id="asciiScale">
+          <option value="1" selected>1x（每像素一个字符）</option>
+          <option value="2">2x（2×2 像素一个字符）</option>
+          <option value="4">4x（4×4 像素一个字符）</option>
+        </select>
+      </div>
+      <div class="row">
+        <label class="mini-label" style="margin:0">前景</label>
+        <input type="color" id="asciiFg" value="#ffffff" style="width:44px;height:28px;border:1px solid var(--line);background:transparent">
+        <label class="mini-label" style="margin:0; margin-left:10px">背景</label>
+        <input type="color" id="asciiBg" value="#000000" style="width:44px;height:28px;border:1px solid var(--line);background:transparent">
+      </div>
+      <div id="asciiPreviewWrap" style="margin-top:10px; max-height:220px; overflow:auto; border:1px solid var(--line); padding:8px; background:#0c0c10;">
+        <pre id="asciiPreview" style="margin:0; font-family:ui-monospace,Consolas,monospace; font-size:10px; line-height:1.2; color:#fff;"></pre>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="px-btn" id="btnAsciiCopy">📋 复制</button>
+      <button class="px-btn" id="btnAsciiDownload">⬇️ 下载 txt</button>
+      <button class="px-btn primary" id="btnCloseAscii">完成 ✔</button>
+    </div>
+  </div>
+</div>
+<script>
+/* omggif (MIT, deanm) — 成熟稳定 GIF89a 编码器（Dean McNamee，Piskel 同款） */
+// (c) Dean McNamee <dean@gmail.com>, 2013.
+//
+// https://github.com/deanm/omggif
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to
+// deal in the Software without restriction, including without limitation the
+// rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+// sell copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+// IN THE SOFTWARE.
+//
+// omggif is a JavaScript implementation of a GIF 89a encoder and decoder,
+// including animation and compression.  It does not rely on any specific
+// underlying system, so should run in the browser, Node, or Plask.
+
+"use strict";
+
+function GifWriter(buf, width, height, gopts) {
+  var p = 0;
+
+  var gopts = gopts === undefined ? { } : gopts;
+  var loop_count = gopts.loop === undefined ? null : gopts.loop;
+  var global_palette = gopts.palette === undefined ? null : gopts.palette;
+
+  if (width <= 0 || height <= 0 || width > 65535 || height > 65535)
+    throw new Error("Width/Height invalid.");
+
+  function check_palette_and_num_colors(palette) {
+    var num_colors = palette.length;
+    if (num_colors < 2 || num_colors > 256 ||  num_colors & (num_colors-1)) {
+      throw new Error(
+          "Invalid code/color length, must be power of 2 and 2 .. 256.");
+    }
+    return num_colors;
+  }
+
+  // - Header.
+  buf[p++] = 0x47; buf[p++] = 0x49; buf[p++] = 0x46;  // GIF
+  buf[p++] = 0x38; buf[p++] = 0x39; buf[p++] = 0x61;  // 89a
+
+  // Handling of Global Color Table (palette) and background index.
+  var gp_num_colors_pow2 = 0;
+  var background = 0;
+  if (global_palette !== null) {
+    var gp_num_colors = check_palette_and_num_colors(global_palette);
+    while (gp_num_colors >>= 1) ++gp_num_colors_pow2;
+    gp_num_colors = 1 << gp_num_colors_pow2;
+    --gp_num_colors_pow2;
+    if (gopts.background !== undefined) {
+      background = gopts.background;
+      if (background >= gp_num_colors)
+        throw new Error("Background index out of range.");
+      // The GIF spec states that a background index of 0 should be ignored, so
+      // this is probably a mistake and you really want to set it to another
+      // slot in the palette.  But actually in the end most browsers, etc end
+      // up ignoring this almost completely (including for dispose background).
+      if (background === 0)
+        throw new Error("Background index explicitly passed as 0.");
+    }
+  }
+
+  // - Logical Screen Descriptor.
+  // NOTE(deanm): w/h apparently ignored by implementations, but set anyway.
+  buf[p++] = width & 0xff; buf[p++] = width >> 8 & 0xff;
+  buf[p++] = height & 0xff; buf[p++] = height >> 8 & 0xff;
+  // NOTE: Indicates 0-bpp original color resolution (unused?).
+  buf[p++] = (global_palette !== null ? 0x80 : 0) |  // Global Color Table Flag.
+             gp_num_colors_pow2;  // NOTE: No sort flag (unused?).
+  buf[p++] = background;  // Background Color Index.
+  buf[p++] = 0;  // Pixel aspect ratio (unused?).
+
+  // - Global Color Table
+  if (global_palette !== null) {
+    for (var i = 0, il = global_palette.length; i < il; ++i) {
+      var rgb = global_palette[i];
+      buf[p++] = rgb >> 16 & 0xff;
+      buf[p++] = rgb >> 8 & 0xff;
+      buf[p++] = rgb & 0xff;
+    }
+  }
+
+  if (loop_count !== null) {  // Netscape block for looping.
+    if (loop_count < 0 || loop_count > 65535)
+      throw new Error("Loop count invalid.")
+    // Extension code, label, and length.
+    buf[p++] = 0x21; buf[p++] = 0xff; buf[p++] = 0x0b;
+    // NETSCAPE2.0
+    buf[p++] = 0x4e; buf[p++] = 0x45; buf[p++] = 0x54; buf[p++] = 0x53;
+    buf[p++] = 0x43; buf[p++] = 0x41; buf[p++] = 0x50; buf[p++] = 0x45;
+    buf[p++] = 0x32; buf[p++] = 0x2e; buf[p++] = 0x30;
+    // Sub-block
+    buf[p++] = 0x03; buf[p++] = 0x01;
+    buf[p++] = loop_count & 0xff; buf[p++] = loop_count >> 8 & 0xff;
+    buf[p++] = 0x00;  // Terminator.
+  }
+
+
+  var ended = false;
+
+  this.addFrame = function(x, y, w, h, indexed_pixels, opts) {
+    if (ended === true) { --p; ended = false; }  // Un-end.
+
+    opts = opts === undefined ? { } : opts;
+
+    // TODO(deanm): Bounds check x, y.  Do they need to be within the virtual
+    // canvas width/height, I imagine?
+    if (x < 0 || y < 0 || x > 65535 || y > 65535)
+      throw new Error("x/y invalid.")
+
+    if (w <= 0 || h <= 0 || w > 65535 || h > 65535)
+      throw new Error("Width/Height invalid.")
+
+    if (indexed_pixels.length < w * h)
+      throw new Error("Not enough pixels for the frame size.");
+
+    var using_local_palette = true;
+    var palette = opts.palette;
+    if (palette === undefined || palette === null) {
+      using_local_palette = false;
+      palette = global_palette;
+    }
+
+    if (palette === undefined || palette === null)
+      throw new Error("Must supply either a local or global palette.");
+
+    var num_colors = check_palette_and_num_colors(palette);
+
+    // Compute the min_code_size (power of 2), destroying num_colors.
+    var min_code_size = 0;
+    while (num_colors >>= 1) ++min_code_size;
+    num_colors = 1 << min_code_size;  // Now we can easily get it back.
+
+    var delay = opts.delay === undefined ? 0 : opts.delay;
+
+    // From the spec:
+    //     0 -   No disposal specified. The decoder is
+    //           not required to take any action.
+    //     1 -   Do not dispose. The graphic is to be left
+    //           in place.
+    //     2 -   Restore to background color. The area used by the
+    //           graphic must be restored to the background color.
+    //     3 -   Restore to previous. The decoder is required to
+    //           restore the area overwritten by the graphic with
+    //           what was there prior to rendering the graphic.
+    //  4-7 -    To be defined.
+    // NOTE(deanm): Dispose background doesn't really work, apparently most
+    // browsers ignore the background palette index and clear to transparency.
+    var disposal = opts.disposal === undefined ? 0 : opts.disposal;
+    if (disposal < 0 || disposal > 3)  // 4-7 is reserved.
+      throw new Error("Disposal out of range.");
+
+    var use_transparency = false;
+    var transparent_index = 0;
+    if (opts.transparent !== undefined && opts.transparent !== null) {
+      use_transparency = true;
+      transparent_index = opts.transparent;
+      if (transparent_index < 0 || transparent_index >= num_colors)
+        throw new Error("Transparent color index.");
+    }
+
+    if (disposal !== 0 || use_transparency || delay !== 0) {
+      // - Graphics Control Extension
+      buf[p++] = 0x21; buf[p++] = 0xf9;  // Extension / Label.
+      buf[p++] = 4;  // Byte size.
+
+      buf[p++] = disposal << 2 | (use_transparency === true ? 1 : 0);
+      buf[p++] = delay & 0xff; buf[p++] = delay >> 8 & 0xff;
+      buf[p++] = transparent_index;  // Transparent color index.
+      buf[p++] = 0;  // Block Terminator.
+    }
+
+    // - Image Descriptor
+    buf[p++] = 0x2c;  // Image Seperator.
+    buf[p++] = x & 0xff; buf[p++] = x >> 8 & 0xff;  // Left.
+    buf[p++] = y & 0xff; buf[p++] = y >> 8 & 0xff;  // Top.
+    buf[p++] = w & 0xff; buf[p++] = w >> 8 & 0xff;
+    buf[p++] = h & 0xff; buf[p++] = h >> 8 & 0xff;
+    // NOTE: No sort flag (unused?).
+    // TODO(deanm): Support interlace.
+    buf[p++] = using_local_palette === true ? (0x80 | (min_code_size-1)) : 0;
+
+    // - Local Color Table
+    if (using_local_palette === true) {
+      for (var i = 0, il = palette.length; i < il; ++i) {
+        var rgb = palette[i];
+        buf[p++] = rgb >> 16 & 0xff;
+        buf[p++] = rgb >> 8 & 0xff;
+        buf[p++] = rgb & 0xff;
+      }
+    }
+
+    p = GifWriterOutputLZWCodeStream(
+            buf, p, min_code_size < 2 ? 2 : min_code_size, indexed_pixels);
+
+    return p;
+  };
+
+  this.end = function() {
+    if (ended === false) {
+      buf[p++] = 0x3b;  // Trailer.
+      ended = true;
+    }
+    return p;
+  };
+
+  this.getOutputBuffer = function() { return buf; };
+  this.setOutputBuffer = function(v) { buf = v; };
+  this.getOutputBufferPosition = function() { return p; };
+  this.setOutputBufferPosition = function(v) { p = v; };
+}
+
+// Main compression routine, palette indexes -> LZW code stream.
+// |index_stream| must have at least one entry.
+function GifWriterOutputLZWCodeStream(buf, p, min_code_size, index_stream) {
+  buf[p++] = min_code_size;
+  var cur_subblock = p++;  // Pointing at the length field.
+
+  var clear_code = 1 << min_code_size;
+  var code_mask = clear_code - 1;
+  var eoi_code = clear_code + 1;
+  var next_code = eoi_code + 1;
+
+  var cur_code_size = min_code_size + 1;  // Number of bits per code.
+  var cur_shift = 0;
+  // We have at most 12-bit codes, so we should have to hold a max of 19
+  // bits here (and then we would write out).
+  var cur = 0;
+
+  function emit_bytes_to_buffer(bit_block_size) {
+    while (cur_shift >= bit_block_size) {
+      buf[p++] = cur & 0xff;
+      cur >>= 8; cur_shift -= 8;
+      if (p === cur_subblock + 256) {  // Finished a subblock.
+        buf[cur_subblock] = 255;
+        cur_subblock = p++;
+      }
+    }
+  }
+
+  function emit_code(c) {
+    cur |= c << cur_shift;
+    cur_shift += cur_code_size;
+    emit_bytes_to_buffer(8);
+  }
+
+  // I am not an expert on the topic, and I don't want to write a thesis.
+  // However, it is good to outline here the basic algorithm and the few data
+  // structures and optimizations here that make this implementation fast.
+  // The basic idea behind LZW is to build a table of previously seen runs
+  // addressed by a short id (herein called output code).  All data is
+  // referenced by a code, which represents one or more values from the
+  // original input stream.  All input bytes can be referenced as the same
+  // value as an output code.  So if you didn't want any compression, you
+  // could more or less just output the original bytes as codes (there are
+  // some details to this, but it is the idea).  In order to achieve
+  // compression, values greater then the input range (codes can be up to
+  // 12-bit while input only 8-bit) represent a sequence of previously seen
+  // inputs.  The decompressor is able to build the same mapping while
+  // decoding, so there is always a shared common knowledge between the
+  // encoding and decoder, which is also important for "timing" aspects like
+  // how to handle variable bit width code encoding.
+  //
+  // One obvious but very important consequence of the table system is there
+  // is always a unique id (at most 12-bits) to map the runs.  'A' might be
+  // 4, then 'AA' might be 10, 'AAA' 11, 'AAAA' 12, etc.  This relationship
+  // can be used for an effecient lookup strategy for the code mapping.  We
+  // need to know if a run has been seen before, and be able to map that run
+  // to the output code.  Since we start with known unique ids (input bytes),
+  // and then from those build more unique ids (table entries), we can
+  // continue this chain (almost like a linked list) to always have small
+  // integer values that represent the current byte chains in the encoder.
+  // This means instead of tracking the input bytes (AAAABCD) to know our
+  // current state, we can track the table entry for AAAABC (it is guaranteed
+  // to exist by the nature of the algorithm) and the next character D.
+  // Therefor the tuple of (table_entry, byte) is guaranteed to also be
+  // unique.  This allows us to create a simple lookup key for mapping input
+  // sequences to codes (table indices) without having to store or search
+  // any of the code sequences.  So if 'AAAA' has a table entry of 12, the
+  // tuple of ('AAAA', K) for any input byte K will be unique, and can be our
+  // key.  This leads to a integer value at most 20-bits, which can always
+  // fit in an SMI value and be used as a fast sparse array / object key.
+
+  // Output code for the current contents of the index buffer.
+  var ib_code = index_stream[0] & code_mask;  // Load first input index.
+  var code_table = { };  // Key'd on our 20-bit "tuple".
+
+  emit_code(clear_code);  // Spec says first code should be a clear code.
+
+  // First index already loaded, process the rest of the stream.
+  for (var i = 1, il = index_stream.length; i < il; ++i) {
+    var k = index_stream[i] & code_mask;
+    var cur_key = ib_code << 8 | k;  // (prev, k) unique tuple.
+    var cur_code = code_table[cur_key];  // buffer + k.
+
+    // Check if we have to create a new code table entry.
+    if (cur_code === undefined) {  // We don't have buffer + k.
+      // Emit index buffer (without k).
+      // This is an inline version of emit_code, because this is the core
+      // writing routine of the compressor (and V8 cannot inline emit_code
+      // because it is a closure here in a different context).  Additionally
+      // we can call emit_byte_to_buffer less often, because we can have
+      // 30-bits (from our 31-bit signed SMI), and we know our codes will only
+      // be 12-bits, so can safely have 18-bits there without overflow.
+      // emit_code(ib_code);
+      cur |= ib_code << cur_shift;
+      cur_shift += cur_code_size;
+      while (cur_shift >= 8) {
+        buf[p++] = cur & 0xff;
+        cur >>= 8; cur_shift -= 8;
+        if (p === cur_subblock + 256) {  // Finished a subblock.
+          buf[cur_subblock] = 255;
+          cur_subblock = p++;
+        }
+      }
+
+      if (next_code === 4096) {  // Table full, need a clear.
+        emit_code(clear_code);
+        next_code = eoi_code + 1;
+        cur_code_size = min_code_size + 1;
+        code_table = { };
+      } else {  // Table not full, insert a new entry.
+        // Increase our variable bit code sizes if necessary.  This is a bit
+        // tricky as it is based on "timing" between the encoding and
+        // decoder.  From the encoders perspective this should happen after
+        // we've already emitted the index buffer and are about to create the
+        // first table entry that would overflow our current code bit size.
+        if (next_code >= (1 << cur_code_size)) ++cur_code_size;
+        code_table[cur_key] = next_code++;  // Insert into code table.
+      }
+
+      ib_code = k;  // Index buffer to single input k.
+    } else {
+      ib_code = cur_code;  // Index buffer to sequence in code table.
+    }
+  }
+
+  emit_code(ib_code);  // There will still be something in the index buffer.
+  emit_code(eoi_code);  // End Of Information.
+
+  // Flush / finalize the sub-blocks stream to the buffer.
+  emit_bytes_to_buffer(1);
+
+  // Finish the sub-blocks, writing out any unfinished lengths and
+  // terminating with a sub-block of length 0.  If we have already started
+  // but not yet used a sub-block it can just become the terminator.
+  if (cur_subblock + 1 === p) {  // Started but unused.
+    buf[cur_subblock] = 0;
+  } else {  // Started and used, write length and additional terminator block.
+    buf[cur_subblock] = p - cur_subblock - 1;
+    buf[p++] = 0;
+  }
+  return p;
+}
+
+function GifReader(buf) {
+  var p = 0;
+
+  // - Header (GIF87a or GIF89a).
+  if (buf[p++] !== 0x47 ||            buf[p++] !== 0x49 || buf[p++] !== 0x46 ||
+      buf[p++] !== 0x38 || (buf[p++]+1 & 0xfd) !== 0x38 || buf[p++] !== 0x61) {
+    throw new Error("Invalid GIF 87a/89a header.");
+  }
+
+  // - Logical Screen Descriptor.
+  var width = buf[p++] | buf[p++] << 8;
+  var height = buf[p++] | buf[p++] << 8;
+  var pf0 = buf[p++];  // <Packed Fields>.
+  var global_palette_flag = pf0 >> 7;
+  var num_global_colors_pow2 = pf0 & 0x7;
+  var num_global_colors = 1 << (num_global_colors_pow2 + 1);
+  var background = buf[p++];
+  buf[p++];  // Pixel aspect ratio (unused?).
+
+  var global_palette_offset = null;
+  var global_palette_size   = null;
+
+  if (global_palette_flag) {
+    global_palette_offset = p;
+    global_palette_size = num_global_colors;
+    p += num_global_colors * 3;  // Seek past palette.
+  }
+
+  var no_eof = true;
+
+  var frames = [ ];
+
+  var delay = 0;
+  var transparent_index = null;
+  var disposal = 0;  // 0 - No disposal specified.
+  var loop_count = null;
+
+  this.width = width;
+  this.height = height;
+
+  while (no_eof && p < buf.length) {
+    switch (buf[p++]) {
+      case 0x21:  // Graphics Control Extension Block
+        switch (buf[p++]) {
+          case 0xff:  // Application specific block
+            // Try if it's a Netscape block (with animation loop counter).
+            if (buf[p   ] !== 0x0b ||  // 21 FF already read, check block size.
+                // NETSCAPE2.0
+                buf[p+1 ] == 0x4e && buf[p+2 ] == 0x45 && buf[p+3 ] == 0x54 &&
+                buf[p+4 ] == 0x53 && buf[p+5 ] == 0x43 && buf[p+6 ] == 0x41 &&
+                buf[p+7 ] == 0x50 && buf[p+8 ] == 0x45 && buf[p+9 ] == 0x32 &&
+                buf[p+10] == 0x2e && buf[p+11] == 0x30 &&
+                // Sub-block
+                buf[p+12] == 0x03 && buf[p+13] == 0x01 && buf[p+16] == 0) {
+              p += 14;
+              loop_count = buf[p++] | buf[p++] << 8;
+              p++;  // Skip terminator.
+            } else {  // We don't know what it is, just try to get past it.
+              p += 12;
+              while (true) {  // Seek through subblocks.
+                var block_size = buf[p++];
+                // Bad block size (ex: undefined from an out of bounds read).
+                if (!(block_size >= 0)) throw Error("Invalid block size");
+                if (block_size === 0) break;  // 0 size is terminator
+                p += block_size;
+              }
+            }
+            break;
+
+          case 0xf9:  // Graphics Control Extension
+            if (buf[p++] !== 0x4 || buf[p+4] !== 0)
+              throw new Error("Invalid graphics extension block.");
+            var pf1 = buf[p++];
+            delay = buf[p++] | buf[p++] << 8;
+            transparent_index = buf[p++];
+            if ((pf1 & 1) === 0) transparent_index = null;
+            disposal = pf1 >> 2 & 0x7;
+            p++;  // Skip terminator.
+            break;
+
+          case 0xfe:  // Comment Extension.
+            while (true) {  // Seek through subblocks.
+              var block_size = buf[p++];
+              // Bad block size (ex: undefined from an out of bounds read).
+              if (!(block_size >= 0)) throw Error("Invalid block size");
+              if (block_size === 0) break;  // 0 size is terminator
+              // console.log(buf.slice(p, p+block_size).toString('ascii'));
+              p += block_size;
+            }
+            break;
+
+          default:
+            throw new Error(
+                "Unknown graphic control label: 0x" + buf[p-1].toString(16));
+        }
+        break;
+
+      case 0x2c:  // Image Descriptor.
+        var x = buf[p++] | buf[p++] << 8;
+        var y = buf[p++] | buf[p++] << 8;
+        var w = buf[p++] | buf[p++] << 8;
+        var h = buf[p++] | buf[p++] << 8;
+        var pf2 = buf[p++];
+        var local_palette_flag = pf2 >> 7;
+        var interlace_flag = pf2 >> 6 & 1;
+        var num_local_colors_pow2 = pf2 & 0x7;
+        var num_local_colors = 1 << (num_local_colors_pow2 + 1);
+        var palette_offset = global_palette_offset;
+        var palette_size = global_palette_size;
+        var has_local_palette = false;
+        if (local_palette_flag) {
+          var has_local_palette = true;
+          palette_offset = p;  // Override with local palette.
+          palette_size = num_local_colors;
+          p += num_local_colors * 3;  // Seek past palette.
+        }
+
+        var data_offset = p;
+
+        p++;  // codesize
+        while (true) {
+          var block_size = buf[p++];
+          // Bad block size (ex: undefined from an out of bounds read).
+          if (!(block_size >= 0)) throw Error("Invalid block size");
+          if (block_size === 0) break;  // 0 size is terminator
+          p += block_size;
+        }
+
+        frames.push({x: x, y: y, width: w, height: h,
+                     has_local_palette: has_local_palette,
+                     palette_offset: palette_offset,
+                     palette_size: palette_size,
+                     data_offset: data_offset,
+                     data_length: p - data_offset,
+                     transparent_index: transparent_index,
+                     interlaced: !!interlace_flag,
+                     delay: delay,
+                     disposal: disposal});
+        break;
+
+      case 0x3b:  // Trailer Marker (end of file).
+        no_eof = false;
+        break;
+
+      default:
+        throw new Error("Unknown gif block: 0x" + buf[p-1].toString(16));
+        break;
+    }
+  }
+
+  this.numFrames = function() {
+    return frames.length;
+  };
+
+  this.loopCount = function() {
+    return loop_count;
+  };
+
+  this.frameInfo = function(frame_num) {
+    if (frame_num < 0 || frame_num >= frames.length)
+      throw new Error("Frame index out of range.");
+    return frames[frame_num];
+  }
+
+  this.decodeAndBlitFrameBGRA = function(frame_num, pixels) {
+    var frame = this.frameInfo(frame_num);
+    var num_pixels = frame.width * frame.height;
+    var index_stream = new Uint8Array(num_pixels);  // At most 8-bit indices.
+    GifReaderLZWOutputIndexStream(
+        buf, frame.data_offset, index_stream, num_pixels);
+    var palette_offset = frame.palette_offset;
+
+    // NOTE(deanm): It seems to be much faster to compare index to 256 than
+    // to === null.  Not sure why, but CompareStub_EQ_STRICT shows up high in
+    // the profile, not sure if it's related to using a Uint8Array.
+    var trans = frame.transparent_index;
+    if (trans === null) trans = 256;
+
+    // We are possibly just blitting to a portion of the entire frame.
+    // That is a subrect within the framerect, so the additional pixels
+    // must be skipped over after we finished a scanline.
+    var framewidth  = frame.width;
+    var framestride = width - framewidth;
+    var xleft       = framewidth;  // Number of subrect pixels left in scanline.
+
+    // Output indicies of the top left and bottom right corners of the subrect.
+    var opbeg = ((frame.y * width) + frame.x) * 4;
+    var opend = ((frame.y + frame.height) * width + frame.x) * 4;
+    var op    = opbeg;
+
+    var scanstride = framestride * 4;
+
+    // Use scanstride to skip past the rows when interlacing.  This is skipping
+    // 7 rows for the first two passes, then 3 then 1.
+    if (frame.interlaced === true) {
+      scanstride += width * 4 * 7;  // Pass 1.
+    }
+
+    var interlaceskip = 8;  // Tracking the row interval in the current pass.
+
+    for (var i = 0, il = index_stream.length; i < il; ++i) {
+      var index = index_stream[i];
+
+      if (xleft === 0) {  // Beginning of new scan line
+        op += scanstride;
+        xleft = framewidth;
+        if (op >= opend) { // Catch the wrap to switch passes when interlacing.
+          scanstride = framestride * 4 + width * 4 * (interlaceskip-1);
+          // interlaceskip / 2 * 4 is interlaceskip << 1.
+          op = opbeg + (framewidth + framestride) * (interlaceskip << 1);
+          interlaceskip >>= 1;
+        }
+      }
+
+      if (index === trans) {
+        op += 4;
+      } else {
+        var r = buf[palette_offset + index * 3];
+        var g = buf[palette_offset + index * 3 + 1];
+        var b = buf[palette_offset + index * 3 + 2];
+        pixels[op++] = b;
+        pixels[op++] = g;
+        pixels[op++] = r;
+        pixels[op++] = 255;
+      }
+      --xleft;
+    }
+  };
+
+  // I will go to copy and paste hell one day...
+  this.decodeAndBlitFrameRGBA = function(frame_num, pixels) {
+    var frame = this.frameInfo(frame_num);
+    var num_pixels = frame.width * frame.height;
+    var index_stream = new Uint8Array(num_pixels);  // At most 8-bit indices.
+    GifReaderLZWOutputIndexStream(
+        buf, frame.data_offset, index_stream, num_pixels);
+    var palette_offset = frame.palette_offset;
+
+    // NOTE(deanm): It seems to be much faster to compare index to 256 than
+    // to === null.  Not sure why, but CompareStub_EQ_STRICT shows up high in
+    // the profile, not sure if it's related to using a Uint8Array.
+    var trans = frame.transparent_index;
+    if (trans === null) trans = 256;
+
+    // We are possibly just blitting to a portion of the entire frame.
+    // That is a subrect within the framerect, so the additional pixels
+    // must be skipped over after we finished a scanline.
+    var framewidth  = frame.width;
+    var framestride = width - framewidth;
+    var xleft       = framewidth;  // Number of subrect pixels left in scanline.
+
+    // Output indicies of the top left and bottom right corners of the subrect.
+    var opbeg = ((frame.y * width) + frame.x) * 4;
+    var opend = ((frame.y + frame.height) * width + frame.x) * 4;
+    var op    = opbeg;
+
+    var scanstride = framestride * 4;
+
+    // Use scanstride to skip past the rows when interlacing.  This is skipping
+    // 7 rows for the first two passes, then 3 then 1.
+    if (frame.interlaced === true) {
+      scanstride += width * 4 * 7;  // Pass 1.
+    }
+
+    var interlaceskip = 8;  // Tracking the row interval in the current pass.
+
+    for (var i = 0, il = index_stream.length; i < il; ++i) {
+      var index = index_stream[i];
+
+      if (xleft === 0) {  // Beginning of new scan line
+        op += scanstride;
+        xleft = framewidth;
+        if (op >= opend) { // Catch the wrap to switch passes when interlacing.
+          scanstride = framestride * 4 + width * 4 * (interlaceskip-1);
+          // interlaceskip / 2 * 4 is interlaceskip << 1.
+          op = opbeg + (framewidth + framestride) * (interlaceskip << 1);
+          interlaceskip >>= 1;
+        }
+      }
+
+      if (index === trans) {
+        op += 4;
+      } else {
+        var r = buf[palette_offset + index * 3];
+        var g = buf[palette_offset + index * 3 + 1];
+        var b = buf[palette_offset + index * 3 + 2];
+        pixels[op++] = r;
+        pixels[op++] = g;
+        pixels[op++] = b;
+        pixels[op++] = 255;
+      }
+      --xleft;
+    }
+  };
+}
+
+function GifReaderLZWOutputIndexStream(code_stream, p, output, output_length) {
+  var min_code_size = code_stream[p++];
+
+  var clear_code = 1 << min_code_size;
+  var eoi_code = clear_code + 1;
+  var next_code = eoi_code + 1;
+
+  var cur_code_size = min_code_size + 1;  // Number of bits per code.
+  // NOTE: This shares the same name as the encoder, but has a different
+  // meaning here.  Here this masks each code coming from the code stream.
+  var code_mask = (1 << cur_code_size) - 1;
+  var cur_shift = 0;
+  var cur = 0;
+
+  var op = 0;  // Output pointer.
+
+  var subblock_size = code_stream[p++];
+
+  // TODO(deanm): Would using a TypedArray be any faster?  At least it would
+  // solve the fast mode / backing store uncertainty.
+  // var code_table = Array(4096);
+  var code_table = new Int32Array(4096);  // Can be signed, we only use 20 bits.
+
+  var prev_code = null;  // Track code-1.
+
+  while (true) {
+    // Read up to two bytes, making sure we always 12-bits for max sized code.
+    while (cur_shift < 16) {
+      if (subblock_size === 0) break;  // No more data to be read.
+
+      cur |= code_stream[p++] << cur_shift;
+      cur_shift += 8;
+
+      if (subblock_size === 1) {  // Never let it get to 0 to hold logic above.
+        subblock_size = code_stream[p++];  // Next subblock.
+      } else {
+        --subblock_size;
+      }
+    }
+
+    // TODO(deanm): We should never really get here, we should have received
+    // and EOI.
+    if (cur_shift < cur_code_size)
+      break;
+
+    var code = cur & code_mask;
+    cur >>= cur_code_size;
+    cur_shift -= cur_code_size;
+
+    // TODO(deanm): Maybe should check that the first code was a clear code,
+    // at least this is what you're supposed to do.  But actually our encoder
+    // now doesn't emit a clear code first anyway.
+    if (code === clear_code) {
+      // We don't actually have to clear the table.  This could be a good idea
+      // for greater error checking, but we don't really do any anyway.  We
+      // will just track it with next_code and overwrite old entries.
+
+      next_code = eoi_code + 1;
+      cur_code_size = min_code_size + 1;
+      code_mask = (1 << cur_code_size) - 1;
+
+      // Don't update prev_code ?
+      prev_code = null;
+      continue;
+    } else if (code === eoi_code) {
+      break;
+    }
+
+    // We have a similar situation as the decoder, where we want to store
+    // variable length entries (code table entries), but we want to do in a
+    // faster manner than an array of arrays.  The code below stores sort of a
+    // linked list within the code table, and then "chases" through it to
+    // construct the dictionary entries.  When a new entry is created, just the
+    // last byte is stored, and the rest (prefix) of the entry is only
+    // referenced by its table entry.  Then the code chases through the
+    // prefixes until it reaches a single byte code.  We have to chase twice,
+    // first to compute the length, and then to actually copy the data to the
+    // output (backwards, since we know the length).  The alternative would be
+    // storing something in an intermediate stack, but that doesn't make any
+    // more sense.  I implemented an approach where it also stored the length
+    // in the code table, although it's a bit tricky because you run out of
+    // bits (12 + 12 + 8), but I didn't measure much improvements (the table
+    // entries are generally not the long).  Even when I created benchmarks for
+    // very long table entries the complexity did not seem worth it.
+    // The code table stores the prefix entry in 12 bits and then the suffix
+    // byte in 8 bits, so each entry is 20 bits.
+
+    var chase_code = code < next_code ? code : prev_code;
+
+    // Chase what we will output, either {CODE} or {CODE-1}.
+    var chase_length = 0;
+    var chase = chase_code;
+    while (chase > clear_code) {
+      chase = code_table[chase] >> 8;
+      ++chase_length;
+    }
+
+    var k = chase;
+
+    var op_end = op + chase_length + (chase_code !== code ? 1 : 0);
+    if (op_end > output_length) {
+      console.log("Warning, gif stream longer than expected.");
+      return;
+    }
+
+    // Already have the first byte from the chase, might as well write it fast.
+    output[op++] = k;
+
+    op += chase_length;
+    var b = op;  // Track pointer, writing backwards.
+
+    if (chase_code !== code)  // The case of emitting {CODE-1} + k.
+      output[op++] = k;
+
+    chase = chase_code;
+    while (chase_length--) {
+      chase = code_table[chase];
+      output[--b] = chase & 0xff;  // Write backwards.
+      chase >>= 8;  // Pull down to the prefix code.
+    }
+
+    if (prev_code !== null && next_code < 4096) {
+      code_table[next_code++] = prev_code << 8 | k;
+      // TODO(deanm): Figure out this clearing vs code growth logic better.  I
+      // have an feeling that it should just happen somewhere else, for now it
+      // is awkward between when we grow past the max and then hit a clear code.
+      // For now just check if we hit the max 12-bits (then a clear code should
+      // follow, also of course encoded in 12-bits).
+      if (next_code >= code_mask+1 && cur_code_size < 12) {
+        ++cur_code_size;
+        code_mask = code_mask << 1 | 1;
+      }
+    }
+
+    prev_code = code;
+  }
+
+  if (op !== output_length) {
+    
+  }
+
+  return output;
+}
+
+// CommonJS.
+window.GifWriter = GifWriter; window.GifReader = GifReader;
+
+/* gifenc quantize/applyPalette (MIT, mattdesl) — 仅量化部分（PNN 聚类） */
+var X={signature:"GIF",version:"89a",trailer:59,extensionIntroducer:33,applicationExtensionLabel:255,graphicControlExtensionLabel:249,imageSeparator:44,signatureSize:3,versionSize:3,globalColorTableFlagMask:128,colorResolutionMask:112,sortFlagMask:8,globalColorTableSizeMask:7,applicationIdentifierSize:8,applicationAuthCodeSize:3,disposalMethodMask:28,userInputFlagMask:2,transparentColorFlagMask:1,localColorTableFlagMask:128,interlaceFlagMask:64,idSortFlagMask:32,localColorTableSizeMask:7};function F(t=256){let e=0,s=new Uint8Array(t);return{get buffer(){return s.buffer},reset(){e=0},bytesView(){return s.subarray(0,e)},bytes(){return s.slice(0,e)},writeByte(r){n(e+1),s[e]=r,e++},writeBytes(r,o=0,i=r.length){n(e+i);for(let c=0;c<i;c++)s[e++]=r[c+o]},writeBytesView(r,o=0,i=r.byteLength){n(e+i),s.set(r.subarray(o,o+i),e),e+=i}};function n(r){var o=s.length;if(o>=r)return;var i=1024*1024;r=Math.max(r,o*(o<i?2:1.125)>>>0),o!=0&&(r=Math.max(r,256));let c=s;s=new Uint8Array(r),e>0&&s.set(c.subarray(0,e),0)}}var O=12,J=5003,lt=[0,1,3,7,15,31,63,127,255,511,1023,2047,4095,8191,16383,32767,65535];function at(t,e,s,n,r=F(512),o=new Uint8Array(256),i=new Int32Array(J),c=new Int32Array(J)){let x=i.length,a=Math.max(2,n);o.fill(0),c.fill(0),i.fill(-1);let l=0,f=0,g=a+1,h=g,b=!1,w=h,_=(1<<w)-1,u=1<<g-1,k=u+1,B=u+2,p=0,A=s[0],z=0;for(let y=x;y<65536;y*=2)++z;z=8-z,r.writeByte(a),I(u);let d=s.length;for(let y=1;y<d;y++){t:{let m=s[y],v=(m<<O)+A,M=m<<z^A;if(i[M]===v){A=c[M];break t}let V=M===0?1:x-M;for(;i[M]>=0;)if(M-=V,M<0&&(M+=x),i[M]===v){A=c[M];break t}I(A),A=m,B<1<<O?(c[M]=B++,i[M]=v):(i.fill(-1),B=u+2,b=!0,I(u))}}return I(A),I(k),r.writeByte(0),r.bytesView();function I(y){for(l&=lt[f],f>0?l|=y<<f:l=y,f+=w;f>=8;)o[p++]=l&255,p>=254&&(r.writeByte(p),r.writeBytesView(o,0,p),p=0),l>>=8,f-=8;if((B>_||b)&&(b?(w=h,_=(1<<w)-1,b=!1):(++w,_=w===O?1<<w:(1<<w)-1)),y==k){for(;f>0;)o[p++]=l&255,p>=254&&(r.writeByte(p),r.writeBytesView(o,0,p),p=0),l>>=8,f-=8;p>0&&(r.writeByte(p),r.writeBytesView(o,0,p),p=0)}}}var $=at;function D(t,e,s){return t<<8&63488|e<<2&992|s>>3}function G(t,e,s,n){return t>>4|e&240|(s&240)<<4|(n&240)<<8}function j(t,e,s){return t>>4<<8|e&240|s>>4}function R(t,e,s){return t<e?e:t>s?s:t}function T(t){return t*t}function tt(t,e,s){var n=0,r=1e100;let o=t[e],i=o.cnt,c=o.ac,x=o.rc,a=o.gc,l=o.bc;for(var f=o.fw;f!=0;f=t[f].fw){let h=t[f],b=h.cnt,w=i*b/(i+b);if(!(w>=r)){var g=0;s&&(g+=w*T(h.ac-c),g>=r)||(g+=w*T(h.rc-x),!(g>=r)&&(g+=w*T(h.gc-a),!(g>=r)&&(g+=w*T(h.bc-l),!(g>=r)&&(r=g,n=f))))}}o.err=r,o.nn=n}function Q(){return{ac:0,rc:0,gc:0,bc:0,cnt:0,nn:0,fw:0,bk:0,tm:0,mtm:0,err:0}}function ut(t,e){let s=e==="rgb444"?4096:65536,n=new Array(s),r=t.length;if(e==="rgba4444")for(let o=0;o<r;++o){let i=t[o],c=i>>24&255,x=i>>16&255,a=i>>8&255,l=i&255,f=G(l,a,x,c),g=f in n?n[f]:n[f]=Q();g.rc+=l,g.gc+=a,g.bc+=x,g.ac+=c,g.cnt++}else if(e==="rgb444")for(let o=0;o<r;++o){let i=t[o],c=i>>16&255,x=i>>8&255,a=i&255,l=j(a,x,c),f=l in n?n[l]:n[l]=Q();f.rc+=a,f.gc+=x,f.bc+=c,f.cnt++}else for(let o=0;o<r;++o){let i=t[o],c=i>>16&255,x=i>>8&255,a=i&255,l=D(a,x,c),f=l in n?n[l]:n[l]=Q();f.rc+=a,f.gc+=x,f.bc+=c,f.cnt++}return n}function H(t,e,s={}){let{format:n="rgb565",clearAlpha:r=!0,clearAlphaColor:o=0,clearAlphaThreshold:i=0,oneBitAlpha:c=!1}=s;if(!t||!t.buffer)throw new Error("quantize() expected RGBA Uint8Array data");if(!(t instanceof Uint8Array)&&!(t instanceof Uint8ClampedArray))throw new Error("quantize() expected RGBA Uint8Array data");let x=new Uint32Array(t.buffer),a=s.useSqrt!==!1,l=n==="rgba4444",f=ut(x,n),g=f.length,h=g-1,b=new Uint32Array(g+1);for(var w=0,u=0;u<g;++u){let C=f[u];if(C!=null){var _=1/C.cnt;l&&(C.ac*=_),C.rc*=_,C.gc*=_,C.bc*=_,f[w++]=C}}T(e)/w<.022&&(a=!1);for(var u=0;u<w-1;++u)f[u].fw=u+1,f[u+1].bk=u,a&&(f[u].cnt=Math.sqrt(f[u].cnt));a&&(f[u].cnt=Math.sqrt(f[u].cnt));var k,B,p;for(u=0;u<w;++u){tt(f,u,!1);var A=f[u].err;for(B=++b[0];B>1&&(p=B>>1,!(f[k=b[p]].err<=A));B=p)b[B]=k;b[B]=u}var z=w-e;for(u=0;u<z;){for(var d;;){var I=b[1];if(d=f[I],d.tm>=d.mtm&&f[d.nn].mtm<=d.tm)break;d.mtm==h?I=b[1]=b[b[0]--]:(tt(f,I,!1),d.tm=u);var A=f[I].err;for(B=1;(p=B+B)<=b[0]&&(p<b[0]&&f[b[p]].err>f[b[p+1]].err&&p++,!(A<=f[k=b[p]].err));B=p)b[B]=k;b[B]=I}var y=f[d.nn],m=d.cnt,v=y.cnt,_=1/(m+v);l&&(d.ac=_*(m*d.ac+v*y.ac)),d.rc=_*(m*d.rc+v*y.rc),d.gc=_*(m*d.gc+v*y.gc),d.bc=_*(m*d.bc+v*y.bc),d.cnt+=y.cnt,d.mtm=++u,f[y.bk].fw=y.fw,f[y.fw].bk=y.bk,y.mtm=h}let M=[];var V=0;for(u=0;;++V){let L=R(Math.round(f[u].rc),0,255),C=R(Math.round(f[u].gc),0,255),Y=R(Math.round(f[u].bc),0,255),E=255;if(l){if(E=R(Math.round(f[u].ac),0,255),c){let st=typeof c=="number"?c:127;E=E<=st?0:255}r&&E<=i&&(L=C=Y=o,E=0)}let K=l?[L,C,Y,E]:[L,C,Y];if(xt(M,K)||M.push(K),(u=f[u].fw)==0)break}return M}function xt(t,e){for(let s=0;s<t.length;s++){let n=t[s],r=n[0]===e[0]&&n[1]===e[1]&&n[2]===e[2],o=n.length>=4&&e.length>=4?n[3]===e[3]:!0;if(r&&o)return!0}return!1}function U(t,e){var s=0,n;for(n=0;n<t.length;n++){let r=t[n]-e[n];s+=r*r}return s}function P(t,e){return e>1?Math.round(t/e)*e:t}function et(t,{roundRGB:e=5,roundAlpha:s=10,oneBitAlpha:n=null}={}){let r=new Uint32Array(t.buffer);for(let o=0;o<r.length;o++){let i=r[o],c=i>>24&255,x=i>>16&255,a=i>>8&255,l=i&255;if(c=P(c,s),n){let f=typeof n=="number"?n:127;c=c<=f?0:255}l=P(l,e),a=P(a,e),x=P(x,e),r[o]=c<<24|x<<16|a<<8|l<<0}}function nt(t,e,s="rgb565"){if(!t||!t.buffer)throw new Error("quantize() expected RGBA Uint8Array data");if(!(t instanceof Uint8Array)&&!(t instanceof Uint8ClampedArray))throw new Error("quantize() expected RGBA Uint8Array data");if(e.length>256)throw new Error("applyPalette() only works with 256 colors or less");let n=new Uint32Array(t.buffer),r=n.length,o=s==="rgb444"?4096:65536,i=new Uint8Array(r),c=new Array(o),x=s==="rgba4444";if(s==="rgba4444")for(let a=0;a<r;a++){let l=n[a],f=l>>24&255,g=l>>16&255,h=l>>8&255,b=l&255,w=G(b,h,g,f),_=w in c?c[w]:c[w]=gt(b,h,g,f,e);i[a]=_}else{let a=s==="rgb444"?j:D;for(let l=0;l<r;l++){let f=n[l],g=f>>16&255,h=f>>8&255,b=f&255,w=a(b,h,g),_=w in c?c[w]:c[w]=bt(b,h,g,e);i[l]=_}}return i}function gt(t,e,s,n,r){let o=0,i=1e100;for(let c=0;c<r.length;c++){let x=r[c],a=x[3],l=q(a-n);if(l>i)continue;let f=x[0];if(l+=q(f-t),l>i)continue;let g=x[1];if(l+=q(g-e),l>i)continue;let h=x[2];l+=q(h-s),!(l>i)&&(i=l,o=c)}return o}function bt(t,e,s,n){let r=0,o=1e100;for(let i=0;i<n.length;i++){let c=n[i],x=c[0],a=q(x-t);if(a>o)continue;let l=c[1];if(a+=q(l-e),a>o)continue;let f=c[2];a+=q(f-s),!(a>o)&&(o=a,r=i)}return r}function rt(t,e,s=5){if(!t.length||!e.length)return;let n=t.map(i=>i.slice(0,3)),r=s*s,o=t[0].length;for(let i=0;i<e.length;i++){let c=e[i];c.length<o?c=[c[0],c[1],c[2],255]:c.length>o?c=c.slice(0,3):c=c.slice();let x=N(n,c.slice(0,3),U),a=x[0],l=x[1];l>0&&l<=r&&(t[a]=c)}}function q(t){return t*t}function W(t,e,s=U){let n=Infinity,r=-1;for(let o=0;o<t.length;o++){let i=t[o],c=s(e,i);c<n&&(n=c,r=o)}return r}function N(t,e,s=U){let n=Infinity,r=-1;for(let o=0;o<t.length;o++){let i=t[o],c=s(e,i);c<n&&(n=c,r=o)}return[r,n]}function ot(t,e,s=U){return t[W(t,e,s)]}function ct(t={}){let{initialCapacity:e=4096,auto:s=!0}=t,n=F(e),r=5003,o=new Uint8Array(256),i=new Int32Array(r),c=new Int32Array(r),x=!1;return{reset(){n.reset(),x=!1},finish(){n.writeByte(X.trailer)},bytes(){return n.bytes()},bytesView(){return n.bytesView()},get buffer(){return n.buffer},get stream(){return n},writeHeader:a,writeFrame(l,f,g,h={}){let{transparent:b=!1,transparentIndex:w=0,delay:_=0,palette:u=null,repeat:k=0,colorDepth:B=8,dispose:p=-1}=h,A=!1;if(s?x||(A=!0,a(),x=!0):A=Boolean(h.first),f=Math.max(0,Math.floor(f)),g=Math.max(0,Math.floor(g)),A){if(!u)throw new Error("First frame must include a { palette } option");pt(n,f,g,u,B),it(n,u),k>=0&&dt(n,k)}let z=Math.round(_/10);wt(n,p,z,b,w);let d=Boolean(u)&&!A;ht(n,f,g,d?u:null),d&&it(n,u),yt(n,l,f,g,B,o,i,c)}};function a(){ft(n,"GIF89a")}}function wt(t,e,s,n,r){t.writeByte(33),t.writeByte(249),t.writeByte(4),r<0&&(r=0,n=!1);var o,i;n?(o=1,i=2):(o=0,i=0),e>=0&&(i=e&7),i<<=2;let c=0;t.writeByte(0|i|c|o),S(t,s),t.writeByte(r||0),t.writeByte(0)}function pt(t,e,s,n,r=8){let o=1,i=0,c=Z(n.length)-1,x=o<<7|r-1<<4|i<<3|c,a=0,l=0;S(t,e),S(t,s),t.writeBytes([x,a,l])}function dt(t,e){t.writeByte(33),t.writeByte(255),t.writeByte(11),ft(t,"NETSCAPE2.0"),t.writeByte(3),t.writeByte(1),S(t,e),t.writeByte(0)}function it(t,e){let s=1<<Z(e.length);for(let n=0;n<s;n++){let r=[0,0,0];n<e.length&&(r=e[n]),t.writeByte(r[0]),t.writeByte(r[1]),t.writeByte(r[2])}}function ht(t,e,s,n){if(t.writeByte(44),S(t,0),S(t,0),S(t,e),S(t,s),n){let r=0,o=0,i=Z(n.length)-1;t.writeByte(128|r|o|0|i)}else t.writeByte(0)}function yt(t,e,s,n,r=8,o,i,c){$(s,n,e,r,t,o,i,c)}function S(t,e){t.writeByte(e&255),t.writeByte(e>>8&255)}function ft(t,e){for(var s=0;s<e.length;s++)t.writeByte(e.charCodeAt(s))}function Z(t){return Math.max(Math.ceil(Math.log2(t)),1)}var Bt=ct;window.quantize=H;window.applyPalette=nt;window.prequantize=et;window.nearestColor=ot;
+
+
+</script>
+<script id="app-js">
+"use strict";
+function $(id){ return document.getElementById(id); }
+function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
+
+/* ============ 调色板数据 ============ */
+const PICO8 = [ "#000000","#1D2B53","#7E2553","#008751","#AB5236","#5F574F",
+  "#C2C3C7","#FFF1E8","#FF004D","#FFA300","#FFEC27","#00E436",
+  "#29ADFF","#83769C","#FF77A8","#FFCCAA" ];
+const GB = [ "#0F380F","#306230","#8BAC0F","#9BBC0F" ];
+const SWEETIE16 = [ "#1A1C2C","#5D275D","#B13E53","#EF7D57","#FFCD75","#A7F070","#38B764","#257179",
+  "#29366F","#3B5DC9","#41A6F6","#73EFF7","#F4F4F4","#94B0C2","#566C86","#333C57" ];
+const ENDESGA32 = [ "#BE4A2F","#D77643","#EAD4AA","#E4A672","#B86F50","#733E39","#3E2731","#A22633",
+  "#E43B44","#F77622","#FEAE34","#FEE761","#63C74D","#3E8948","#265C42","#193C3E",
+  "#124E89","#0099DB","#2CE8F5","#FFFFFF","#C0CBDC","#8B9BB4","#5A6988","#3A4466",
+  "#262B44","#181425","#FF0044","#68386C","#B55088","#F6757A","#E8B796","#C28569" ];
+const PALETTES = { pico8: PICO8.slice(), gb: GB.slice(), sweetie16: SWEETIE16.slice(), endesga32: ENDESGA32.slice() };
+
+/* ============ 状态 ============ */
+let state = {
+  w: 64, h: 64,
+  tool: "pen",
+  brush: 1,
+  curColor: "#ffd166",
+  paletteType: "pico8",
+  customPalette: [],
+  selectedSwatch: -1,
+  gridOn: true,
+  showPreview: false,
+  pendingImage: null,   // 导入待转换的 Image
+  undoStack: [], redoStack: [],
+  // Phase 2 动画
+  frames: [],           // Array<ImageData>
+  frameIdx: 0,
+  onionOn: false,
+  onionOpacity: 0.3,
+  loopPlay: true,
+  playing: false,
+  // Phase 2 对称
+  symmetry: "none",     // none | h | v | hv
+  // Phase 3 选区 + 形状
+  selRect: null,        // {x0,y0,x1,y1} 归一化（x0<=x1）
+  selClip: null,        // 剪贴板 {w,h,data:Uint8ClampedArray, offX, offY}
+  clipMode: false,      // 粘贴浮动模式：显示 ghost 等待放置
+  clipGhostX: 0, clipGhostY: 0,
+  shapeFill: false,     // 形状实心/空心
+  brushShape: "square", // 笔尖形状 square | circle
+  // Phase 3 P1 参考层
+  refOn: false,         // 是否已导入参考图
+  refVisible: true,     // 显示开关
+  refOpacity: 0.45,     // 透明度
+  refScale: 1,          // 缩放比例
+};
+let canvas, ctx, cell = 10;
+let drawing = false, lastX = -1, lastY = -1, lineStart = null, startPX = -1, startPY = -1;
+let baseSnapshot = null;
+// Phase 3 选区
+let selDragMode = null;   // null | "new" | "move"
+let selDragStart = null;  // 移动起点 {x,y,origX,origY} 原始选区位置
+let selMoveBase = null;   // 移动预览基线（lift 前整帧快照）
+function saveBaseSnapshot(){
+  baseSnapshot = snap();   // getImageData 读回（稳定路径）
+}
+
+/* ============ 画布 ============ */
+function resizeCanvas(w, h){
+  state.w = w; state.h = h;
+  canvas.width = w; canvas.height = h;
+  ctx.fillStyle = "rgba(0,0,0,0)";
+  ctx.clearRect(0,0,w,h);
+  // 尺寸变更：重建所有帧（旧帧数据放缩到新尺寸）
+  const oldFrames = state.frames;
+  state.frames = [];
+  if(oldFrames.length){
+    // 按比例放缩旧帧到新画布
+    const oldW = oldFrames[0].width || w, oldH = oldFrames[0].height || h;
+    oldFrames.forEach(function(fr){
+      const tmp = document.createElement("canvas");
+      tmp.width = oldW; tmp.height = oldH;
+      tmp.getContext("2d").putImageData(fr,0,0);
+      const nf = ctx.createImageData(w,h);
+      // 最近邻缩放 到新尺寸（居中）
+      const c2 = document.createElement("canvas");
+      c2.width = w; c2.height = h;
+      const cc = c2.getContext("2d");
+      cc.imageSmoothingEnabled = false;
+      cc.drawImage(tmp,0,0,oldW,oldH,0,0,w,h);
+      const nd = cc.getImageData(0,0,w,h);
+      nf.data.set(nd.data);
+      state.frames.push(nf);
+    });
+  } else {
+    state.frames = [newFrameData()];
+  }
+  state.frameIdx = 0;
+  state.undoStack = []; state.redoStack = [];
+  updateStageSize();
+  syncCanvasFromFrame();
+  updateFrameBar();
+  renderOnion();
+  renderRefLayer();
+  render();
+}
+function updateStageSize(){
+  const dpr = window.devicePixelRatio || 1;
+  canvas.style.width = (state.w * cell) + "px";
+  canvas.style.height = (state.h * cell) + "px";
+  $("gridlines").style.backgroundSize = cell + "px " + cell + "px";
+  const g = $("gridlines");
+  g.style.backgroundImage = state.gridOn
+    ? "linear-gradient(to right, rgba(255,255,255,.08) 1px, transparent 1px),linear-gradient(to bottom, rgba(255,255,255,.08) 1px, transparent 1px)"
+    : "none";
+  $("sizeInfo").textContent = state.w + "×" + state.h + "  ·  " + (state.w*state.h) + " px";
+}
+function canvasPos(e){
+  const r = canvas.getBoundingClientRect();
+  const cx = e.touches ? e.touches[0].clientX : e.clientX;
+  const cy = e.touches ? e.touches[0].clientY : e.clientY;
+  const px = Math.floor((cx - r.left) / (r.width / state.w));
+  const py = Math.floor((cy - r.top) / (r.height / state.h));
+  return { x: clamp(px,0,state.w-1), y: clamp(py,0,state.h-1) };
+}
+function render(){
+  ctx.imageSmoothingEnabled = false;
+  // drawImage 自拷贝确保 paint 状态一致（GPU 路径，无 getImageData 读回）
+  ctx.drawImage(canvas, 0, 0);
+}
+function pixels(){
+  return ctx.getImageData(0,0,state.w,state.h);
+}
+function drawPixel(x,y,color){
+  const pts = mirrorPoints(x,y);
+  for(let k=0;k<pts.length;k++){
+    const px = pts[k][0], py = pts[k][1];
+    if(px<0||py<0||px>=state.w||py>=state.h) continue;
+    if(color === "rgba(0,0,0,0)"){
+      ctx.clearRect(px, py, 1, 1);
+    } else {
+      ctx.fillStyle = color;
+      ctx.fillRect(px, py, 1, 1);
+    }
+  }
+}
+function getPixel(x,y){
+  const d = ctx.getImageData(x, y, 1, 1);
+  return [d.data[0], d.data[1], d.data[2], d.data[3]];
+}
+function setPixelInData(d, x, y, r, g, b, a){
+  const i = (y*state.w + x)*4;
+  d.data[i]=r; d.data[i+1]=g; d.data[i+2]=b; d.data[i+3]=a;
+}
+function hexToRgb(h){
+  h = h.replace("#","");
+  if(h.length===3) h = h.split("").map(c=>c+c).join("");
+  return [parseInt(h.substr(0,2),16), parseInt(h.substr(2,2),16), parseInt(h.substr(4,2),16)];
+}
+function rgbToHex(r,g,b){
+  return "#" + [r,g,b].map(v=>clamp(Math.round(v),0,255).toString(16).padStart(2,"0")).join("");
+}
+function strokeColor(){ return state.tool==="eraser" ? "rgba(0,0,0,0)" : state.curColor; }
+
+/* ============ Phase 3 选区 ============ */
+function normRect(a,b){
+  return { x0: Math.min(a.x,b.x), y0: Math.min(a.y,b.y), x1: Math.max(a.x,b.x), y1: Math.max(a.y,b.y) };
+}
+function selWidth(){ return state.selRect ? (state.selRect.x1 - state.selRect.x0 + 1) : 0; }
+function selHeight(){ return state.selRect ? (state.selRect.y1 - state.selRect.y0 + 1) : 0; }
+function selInside(x,y){
+  if(!state.selRect) return false;
+  return x>=state.selRect.x0 && x<=state.selRect.x1 && y>=state.selRect.y0 && y<=state.selRect.y1;
+}
+function renderSelectLayer(){
+  const layer = $("selectLayer");
+  layer.innerHTML = "";
+  if(state.tool!=="select" && state.clipMode===false){ layer.style.display="none"; return; }
+  // 粘贴浮动 ghost
+  if(state.clipMode && state.selClip){
+    layer.style.display="block";
+    const g = document.createElement("div");
+    g.className = "ghost";
+    const c = document.createElement("canvas");
+    c.width = state.selClip.w; c.height = state.selClip.h;
+    const cc = c.getContext("2d");
+    const img = cc.createImageData(state.selClip.w, state.selClip.h);
+    img.data.set(state.selClip.data);
+    cc.putImageData(img,0,0);
+    g.appendChild(c);
+    c.style.width = (state.selClip.w * cell) + "px";
+    c.style.height = (state.selClip.h * cell) + "px";
+    g.style.left = (state.clipGhostX * cell) + "px";
+    g.style.top = (state.clipGhostY * cell) + "px";
+    layer.appendChild(g);
+    return;
+  }
+  // 选区 marquee
+  if(state.selRect && state.tool==="select"){
+    layer.style.display="block";
+    const m = document.createElement("div");
+    m.className = "marquee";
+    m.style.left = (state.selRect.x0 * cell) + "px";
+    m.style.top = (state.selRect.y0 * cell) + "px";
+    m.style.width = (selWidth() * cell) + "px";
+    m.style.height = (selHeight() * cell) + "px";
+    layer.appendChild(m);
+  }
+}
+function clearSelection(){
+  state.selRect = null;
+  if(state.clipMode){ state.clipMode = false; state.selClip = null; }
+  renderSelectLayer();
+}
+// 框选：拖拽时更新选区
+function updateSelection(a,b){
+  const r = normRect(a,b);
+  state.selRect = { x0: r.x0, y0: r.y0, x1: r.x1, y1: r.y1 };
+  renderSelectLayer();
+}
+// 读取选区像素到剪贴板
+function copySelection(){
+  if(!state.selRect) return false;
+  const w = selWidth(), h = selHeight();
+  const img = ctx.getImageData(state.selRect.x0, state.selRect.y0, w, h);
+  state.selClip = { w, h, data: new Uint8ClampedArray(img.data), offX: 0, offY: 0 };
+  return true;
+}
+// 粘贴：进入浮动放置模式
+function enterPaste(){
+  if(!state.selClip) return;
+  state.clipMode = true;
+  state.clipGhostX = state.selRect ? state.selRect.x0 : 0;
+  state.clipGhostY = state.selRect ? state.selRect.y0 : 0;
+  renderSelectLayer();
+}
+// 应用剪贴板到指定位置（不推历史）
+function blitClip(x,y){
+  if(!state.selClip) return;
+  const c = state.selClip;
+  const img = ctx.createImageData(c.w, c.h);
+  img.data.set(c.data);
+  ctx.putImageData(img, x, y);
+}
+// 移动选区：把选区内容搬走（原地透明），返回搬走的 ImageData
+function liftSelection(){
+  const r = state.selRect;
+  const img = ctx.getImageData(r.x0, r.y0, selWidth(), selHeight());
+  ctx.clearRect(r.x0, r.y0, selWidth(), selHeight());
+  return img;
+}
+// 粘贴浮动放置：应用到画布 + 写历史
+function syncClippedPlace(x,y){
+  const c = state.selClip;
+  ctx.putImageData((function(){
+    const img = ctx.createImageData(c.w, c.h);
+    img.data.set(c.data);
+    return img;
+  })(), x, y);
+  state.clipMode = false;
+  state.selClip = null;
+  renderSelectLayer();
+  pushHistory();
+  syncFrameFromCanvas();
+  updateFrameThumbs();
+  renderOnion();
+}
+// 翻转/旋转选区内容（原地，进历史由调用方 pushHistory）
+function transformSelection(kind){
+  if(!state.selRect) return;
+  const w = selWidth(), h = selHeight();
+  const src = ctx.getImageData(state.selRect.x0, state.selRect.y0, w, h).data;
+  const out = ctx.createImageData(w, h);
+  let nw = w, nh = h;
+  if(kind === "rotate"){
+    // 90° 旋转：宽高互换
+    nw = h; nh = w;
+  }
+  const outData = ctx.createImageData(nw, nh);
+  for(let y=0;y<nh;y++){
+    for(let x=0;x<nw;x++){
+      let sx, sy;
+      if(kind === "flipH"){ sx = w-1-x; sy = y; }
+      else if(kind === "flipV"){ sx = x; sy = h-1-y; }
+      else if(kind === "rotate"){
+        // 顺时针 90°：输出 (x,y) ← 源 (y, h-1-x)，输出宽高互换（sy 用源高 h）
+        sx = y; sy = h-1-x;
+      }
+      if(sx<0||sx>=w||sy<0||sy>=h){ continue; }
+      const si = (sy*w + sx)*4, di = (y*nw + x)*4;
+      outData.data[di] = src[si]; outData.data[di+1] = src[si+1]; outData.data[di+2] = src[si+2]; outData.data[di+3] = src[si+3];
+    }
+  }
+  // 旋转几何变化：旧选区清空，若新尺寸超出边界则不允许
+  if(kind === "rotate"){
+    const nx = state.selRect.x0, ny = state.selRect.y0;
+    if(nx+nw > state.w || ny+nh > state.h){
+      alert("旋转后超出画布边界，请先缩小选区或换位置");
+      return;
+    }
+    ctx.clearRect(state.selRect.x0, state.selRect.y0, w, h);
+    ctx.putImageData(outData, nx, ny);
+    // 更新选区为新的宽高
+    state.selRect = { x0:nx, y0:ny, x1:nx+nw-1, y1:ny+nh-1 };
+  } else {
+    ctx.clearRect(state.selRect.x0, state.selRect.y0, w, h);
+    ctx.putImageData(outData, state.selRect.x0, state.selRect.y0);
+  }
+  renderSelectLayer();
+}
+
+/* ============ Phase 3 形状 ============ */
+function drawRectShape(x0,y0,x1,y1,color,fill){
+  const r = normRect({x:x0,y:y0},{x:x1,y:y1});
+  const w = r.x1-r.x0+1, h = r.y1-r.y0+1;
+  if(fill){
+    // 实心：每个像素 drawPixel（走对称）
+    for(let y=r.y0;y<=r.y1;y++){
+      for(let x=r.x0;x<=r.x1;x++){
+        drawPixel(x,y,color);
+      }
+    }
+  } else {
+    // 空心：四条边（去重顶点）
+    for(let x=r.x0;x<=r.x1;x++){ drawPixel(x,r.y0,color); drawPixel(x,r.y1,color); }
+    if(h>1) for(let y=r.y0+1;y<r.y1;y++){ drawPixel(r.x0,y,color); drawPixel(r.x1,y,color); }
+  }
+}
+function drawEllipseShape(x0,y0,x1,y1,color,fill){
+  const r = normRect({x:x0,y:y0},{x:x1,y:y1});
+  const cx = (r.x0+r.x1)/2, cy = (r.y0+r.y1)/2;
+  const rx = Math.max(1, (r.x1-r.x0+1)/2), ry = Math.max(1, (r.y1-r.y0+1)/2);
+  const left = Math.floor(cx-rx), top = Math.floor(cy-ry), right = Math.ceil(cx+rx), bottom = Math.ceil(cy+ry);
+  // 中点椭圆算法逐点判定（含边界）
+  for(let y=top;y<=bottom;y++){
+    for(let x=left;x<=right;x++){
+      const nx = (x-cx+0.5)/rx, ny = (y-cy+0.5)/ry;
+      const inside = nx*nx + ny*ny <= 1;
+      if(!inside) continue;
+      if(fill){
+        drawPixel(x,y,color);
+      } else {
+        // 空心：只在边界（检查相邻像素是否在圆内）
+        const adj = [
+          [(x-cx-0.5)/rx,(y-cy+0.5)/ry],[(x-cx+1.5)/rx,(y-cy+0.5)/ry],
+          [(x-cx+0.5)/rx,(y-cy-0.5)/ry],[(x-cx+0.5)/rx,(y-cy+1.5)/ry]
+        ];
+        const anyOutside = adj.some(function(a){ return a[0]*a[0]+a[1]*a[1] > 1; });
+        if(anyOutside) drawPixel(x,y,color);
+      }
+    }
+  }
+}
+
+/* ============ 帧管理（Phase 2 动画） ============ */
+let onionCanvas = null, onionCtx = null;
+function ensureOnionCanvas(){
+  if(!onionCanvas){
+    onionCanvas = document.createElement("canvas");
+    onionCanvas.width = state.w; onionCanvas.height = state.h;
+    onionCtx = onionCanvas.getContext("2d");
+  }
+  onionCanvas.width = state.w; onionCanvas.height = state.h;
+}
+function newFrameData(){
+  // 全透明帧
+  return ctx.createImageData(state.w, state.h);
+}
+function currentFrame(){
+  return state.frames[state.frameIdx];
+}
+function syncCanvasFromFrame(){
+  // 绘制过程中 canvas 就是当前帧的实时状态；切帧时才需要 put
+  const f = currentFrame();
+  if(f) ctx.putImageData(f, 0, 0);
+}
+function syncFrameFromCanvas(){
+  const f = currentFrame();
+  if(f){
+    const d = ctx.getImageData(0,0,state.w,state.h);
+    f.data.set(d.data);
+  }
+  updateFrameThumbs();
+}
+function addFrame(){
+  syncFrameFromCanvas();
+  state.frames.push(newFrameData());
+  state.frameIdx = state.frames.length - 1;
+  syncCanvasFromFrame();
+  pushHistory();
+  updateFrameBar();
+}
+function dupFrame(){
+  syncFrameFromCanvas();
+  const src = currentFrame();
+  const copy = ctx.createImageData(state.w, state.h);
+  copy.data.set(src.data);
+  state.frames.splice(state.frameIdx + 1, 0, copy);
+  state.frameIdx = state.frameIdx + 1;
+  syncCanvasFromFrame();
+  pushHistory();
+  updateFrameBar();
+}
+function delFrame(){
+  if(state.frames.length <= 1){ alert("至少保留一帧"); return; }
+  state.frames.splice(state.frameIdx, 1);
+  if(state.frameIdx >= state.frames.length) state.frameIdx = state.frames.length - 1;
+  syncCanvasFromFrame();
+  pushHistory();
+  updateFrameBar();
+}
+function switchFrame(idx){
+  if(idx === state.frameIdx) return;
+  syncFrameFromCanvas();
+  state.frameIdx = idx;
+  syncCanvasFromFrame();
+  updateFrameBar();
+}
+function moveFrame(from, to){
+  if(from===to) return;
+  syncFrameFromCanvas();
+  const f = state.frames.splice(from,1)[0];
+  state.frames.splice(to,0,f);
+  state.frameIdx = to;
+  syncCanvasFromFrame();
+  updateFrameBar();
+}
+/* 洋葱皮：把前后帧画到 onionLayer 显示 */
+function renderOnion(){
+  const layer = $("onionLayer");
+  if(!state.onionOn || state.playing){
+    layer.style.backgroundImage = "none";
+    return;
+  }
+  const alpha = state.onionOpacity;
+  ensureOnionCanvas();
+  onionCtx.clearRect(0,0,state.w,state.h);
+  const n = state.frames.length;
+  const drawFrameAt = function(fr, a){
+    if(!fr) return;
+    onionCtx.globalAlpha = a;
+    onionCtx.imageSmoothingEnabled = false;
+    // 用临时 canvas 承载帧数据再画（ImageData 直接 put 到 onion 再 drawImage 会残留）
+    const tmp = document.createElement("canvas");
+    tmp.width = state.w; tmp.height = state.h;
+    const tc = tmp.getContext("2d");
+    tc.putImageData(fr, 0, 0);
+    onionCtx.drawImage(tmp, 0, 0);
+    onionCtx.globalAlpha = 1;
+  };
+  // 前帧（更透明）+ 后帧
+  drawFrameAt(state.frames[state.frameIdx-1], alpha * 0.6);
+  drawFrameAt(state.frames[state.frameIdx+1], alpha);
+  layer.style.backgroundImage = "url(" + onionCanvas.toDataURL() + ")";
+  layer.style.backgroundSize = "100% 100%";
+  layer.style.imageRendering = "pixelated";
+}
+function updateFrameThumbs(){
+  const strip = $("frameStrip");
+  if(!strip) return;
+  // 缩略图：用小 canvas 画帧数据
+  const thumbs = strip.querySelectorAll(".frame-thumb");
+  state.frames.forEach(function(fr, i){
+    const t = thumbs[i];
+    if(!t) return;
+    const cv = t.querySelector("canvas");
+    if(!cv) return;
+    cv.width = state.w; cv.height = state.h;
+    const tc = cv.getContext("2d");
+    tc.putImageData(fr, 0, 0);
+  });
+}
+function updateFrameBar(){
+  const strip = $("frameStrip");
+  if(!strip) return;
+  strip.innerHTML = "";
+  state.frames.forEach(function(fr, i){
+    const thumb = document.createElement("div");
+    thumb.className = "frame-thumb" + (i===state.frameIdx ? " active" : "");
+    thumb.dataset.idx = i;
+    const idx = document.createElement("span");
+    idx.className = "frame-idx";
+    idx.textContent = i+1;
+    const cv = document.createElement("canvas");
+    cv.width = state.w; cv.height = state.h;
+    const tc = cv.getContext("2d");
+    tc.putImageData(fr, 0, 0);
+    thumb.appendChild(idx);
+    thumb.appendChild(cv);
+    thumb.addEventListener("click", function(){ switchFrame(parseInt(this.dataset.idx,10)); });
+    strip.appendChild(thumb);
+  });
+  $("frameInfo").textContent = (state.frameIdx+1) + " / " + state.frames.length + " 帧";
+}
+
+/* 对称绘制：返回镜像点数组 */
+function mirrorPoints(x, y){
+  const pts = [[x,y]];
+  const W = state.w-1, H = state.h-1;
+  if(state.symmetry==="h" || state.symmetry==="hv"){
+    const mx = W - x;
+    if(mx!==x) pts.push([mx, y]);
+  }
+  if(state.symmetry==="v" || state.symmetry==="hv"){
+    const my = H - y;
+    if(my!==y) pts.push([x, my]);
+  }
+  if(state.symmetry==="hv"){
+    const mx = W - x, my = H - y;
+    if(mx!==x || my!==y) pts.push([mx, my]);
+  }
+  return pts;
+}
+
+/* ============ 撤销 / 重做 ============ */
+function snap(){ return ctx.getImageData(0,0,state.w,state.h); }
+function pushHistory(){
+  syncFrameFromCanvas();           // 确保 canvas 内容同步回当前帧
+  state.undoStack.push({ frameIdx: state.frameIdx, data: snap() });
+  if(state.undoStack.length > 200) state.undoStack.shift();
+  state.redoStack = [];
+  updateHUD();
+}
+function doUndoRedo(s){
+  // 切到对应帧并恢复快照
+  state.frameIdx = s.frameIdx;
+  syncCanvasFromFrame();
+  ctx.putImageData(s.data, 0, 0);
+  currentFrame().data.set(s.data);   // 同步回帧数据
+  updateFrameBar();
+  renderOnion();
+}
+function undo(){
+  if(!state.undoStack.length) return;
+  syncFrameFromCanvas();
+  state.redoStack.push({ frameIdx: state.frameIdx, data: snap() });
+  const s = state.undoStack.pop();
+  doUndoRedo(s);
+  updateHUD();
+}
+function redo(){
+  if(!state.redoStack.length) return;
+  syncFrameFromCanvas();
+  state.undoStack.push({ frameIdx: state.frameIdx, data: snap() });
+  const s = state.redoStack.pop();
+  doUndoRedo(s);
+  updateHUD();
+}
+function updateHUD(){
+  $("undoCount").textContent = state.undoStack.length;
+  $("redoCount").textContent = state.redoStack.length;
+}
+/* ============ 绘制 ============ */
+function floodFill(x, y, fillColor){
+  const target = getPixel(x,y);
+  const fr = fillColor==="rgba(0,0,0,0)" ? null : hexToRgb(fillColor);
+  if(fr && target[0]===fr[0] && target[1]===fr[1] && target[2]===fr[2] && target[3]===255) return;
+  if(!fr && target[3]===0) return;
+  const img = ctx.getImageData(0,0,state.w,state.h);
+  const d = img.data;
+  const W = state.w, H = state.h;
+  const stack = [[x,y]];
+  const tc = [target[0],target[1],target[2],target[3]];
+  const match = (i)=>
+    d[i]===tc[0] && d[i+1]===tc[1] && d[i+2]===tc[2] && d[i+3]===tc[3];
+  const write = (i)=>{
+    if(fr){ d[i]=fr[0]; d[i+1]=fr[1]; d[i+2]=fr[2]; d[i+3]=255; }
+    else  { d[i+3]=0; }
+  };
+  while(stack.length){
+    const p = stack.pop();
+    const px = p[0], py = p[1];
+    const i = (py*W + px)*4;
+    if(!match(i)) continue;
+    write(i);
+    // 向左/右扩展
+    let left = px-1, right = px+1;
+    while(left>=0 && match((py*W+left)*4)){ write((py*W+left)*4); left--; }
+    while(right<W && match((py*W+right)*4)){ write((py*W+right)*4); right++; }
+    left++; right--;
+    // 上下扫描线
+    if(py>0)   { for(let xx=left; xx<=right; xx++){ const si=( (py-1)*W+xx)*4; if(match(si)) stack.push([xx,py-1]); } }
+    if(py<H-1) { for(let xx=left; xx<=right; xx++){ const si=( (py+1)*W+xx)*4; if(match(si)) stack.push([xx,py+1]); } }
+  }
+  ctx.putImageData(img,0,0);
+}
+function paintLine(x0,y0,x1,y1,color){
+  // Bresenham
+  const dx=Math.abs(x1-x0), dy=Math.abs(y1-y0);
+  const sx=x0<x1?1:-1, sy=y0<y1?1:-1;
+  let err=dx-dy;
+  while(true){
+    drawPixel(x0,y0,color);
+    if(x0===x1 && y0===y1) break;
+    const e2=2*err;
+    if(e2>-dy){ err-=dy; x0+=sx; }
+    if(e2<dx){ err+=dx; y0+=sy; }
+  }
+}
+// 圆形笔刷 / 圆盘：以 (cx,cy) 为中心画直径 ≈ size 的实心圆（含边界 + 保底 1px）
+function drawDiscAt(cx,cy,size,color){
+  if(size<=1){ drawPixel(clamp(Math.round(cx),0,state.w-1), clamp(Math.round(cy),0,state.h-1), color); return; }
+  const r = (size-1)/2;
+  const x0 = Math.floor(cx-r), x1 = Math.ceil(cx+r);
+  const y0 = Math.floor(cy-r), y1 = Math.ceil(cy+r);
+  const r2 = r*r + 0.0001;
+  for(let y=y0;y<=y1;y++){
+    for(let x=x0;x<=x1;x++){
+      const dx = x-cx, dy = y-cy;
+      if(dx*dx+dy*dy <= r2) drawPixel(clamp(x,0,state.w-1), clamp(y,0,state.h-1), color);
+    }
+  }
+}
+// 对单个像素坐标用当前笔尖形状落笔（方形方块 / 圆形圆盘）
+function drawWithBrush(x,y,color){
+  const b = state.brush;
+  if(b<=1){ drawPixel(clamp(x,0,state.w-1), clamp(y,0,state.h-1), color); return; }
+  if(state.brushShape==="circle"){ drawDiscAt(x,y,b,color); return; }
+  const off = Math.floor(b/2);
+  for(let dy=0; dy<b; dy++) for(let dx=0; dx<b; dx++){
+    drawPixel(clamp(x+dx-off,0,state.w-1), clamp(y+dy-off,0,state.h-1), color);
+  }
+}
+// 沿线段用当前笔尖形状连续落笔（粗线）
+function brushLine(x0,y0,x1,y1,color){
+  if(state.brush<=1){ paintLine(x0,y0,x1,y1,color); return; }
+  const steps = Math.max(Math.abs(x1-x0), Math.abs(y1-y0), 1);
+  for(let i=0;i<=steps;i++){
+    const tx = Math.round(x0 + (x1-x0)*i/steps);
+    const ty = Math.round(y0 + (y1-y0)*i/steps);
+    drawWithBrush(tx,ty,color);
+  }
+}
+function onDown(e){
+  e.preventDefault();
+  // 取色立即生效
+  if(state.tool==="picker"){
+    const p = canvasPos(e);
+    const c = getPixel(p.x,p.y);
+    if(c[3]===0){ state.curColor = "#000000"; }
+    else state.curColor = rgbToHex(c[0],c[1],c[2]);
+    $("colorPicker").value = state.curColor;
+    $("colorHex").textContent = state.curColor;
+    renderPalette();
+    return;
+  }
+  const p = canvasPos(e);
+  // 选区工具：新建框选 / 拖移动选区 / 粘贴浮动置位
+  if(state.tool==="select"){
+    // 粘贴浮动模式：点击放置
+    if(state.clipMode && state.selClip){
+      syncClippedPlace(p.x,p.y);
+      return;
+    }
+    if(state.selRect && selInside(p.x,p.y)){
+      // 开始移动选区：先记录移动前状态（供撤销）
+      pushHistory();
+      drawing = true;
+      selDragMode = "move";
+      selDragStart = { x:p.x, y:p.y, origX:state.selRect.x0, origY:state.selRect.y0 };
+      // 抬起内容（原地透明）
+      state.selPending = liftSelection();
+      selMoveBase = snap();   // 基准：lift 后（选区已空）的整帧
+      renderSelectLayer();
+      return;
+    }
+    // 空白处：新建框选
+    drawing = true;
+    selDragMode = "new";
+    lastX = p.x; lastY = p.y;
+    updateSelection(p,p);
+    return;
+  }
+  drawing = true;
+  lastX = p.x; lastY = p.y;
+  pushHistory();                    // 记录本次 stroke 起点
+  if(state.tool==="line"){
+    lineStart = p;
+    saveBaseSnapshot();             // 直线预览基线（getImageData）
+  }
+  if(state.tool==="rect" || state.tool==="ellipse"){
+    lineStart = p;
+    saveBaseSnapshot();
+    // 形状预览直接落笔（空心/实心即时画，onMove 恢复基线重画）
+    return;
+  }
+  applyToolAt(p.x,p.y,strokeColor());
+}
+function applyToolAt(x,y,color){
+  if(state.tool==="pen" || state.tool==="eraser"){
+    drawWithBrush(x,y,color);
+  } else if(state.tool==="fill"){
+    floodFill(x,y,color);
+    // 对称填充：对每个镜像点分别填充
+    const pts = mirrorPoints(x,y);
+    for(let k=0;k<pts.length;k++){
+      const t = pts[k];
+      if(t[0]===x && t[1]===y) continue;
+      floodFill(t[0],t[1],color);
+    }
+  } else if(state.tool==="line"){
+    if(lineStart) paintLine(lineStart.x, lineStart.y, x, y, color);
+  }
+}
+function onMove(e){
+  const p = canvasPos(e);
+  // 选区工具移动
+  if(state.tool==="select"){
+    if(!drawing) return;
+    e.preventDefault();
+    if(selDragMode === "new"){
+      updateSelection({x:lastX,y:lastY}, p);
+      return;
+    }
+    if(selDragMode === "move" && state.selPending){
+      e.preventDefault();
+      const dx = p.x - selDragStart.x, dy = p.y - selDragStart.y;
+      const nx = selDragStart.origX + dx, ny = selDragStart.origY + dy;
+      // 先恢复 lift 后基准（选区空），再贴到新位置
+      ctx.putImageData(selMoveBase,0,0);
+      state.selRect = { x0:nx, y0:ny, x1:nx+selWidth()-1, y1:ny+selHeight()-1 };
+      ctx.putImageData(state.selPending, nx, ny);
+      renderSelectLayer();
+      return;
+    }
+    return;
+  }
+  if(!drawing) return;
+  e.preventDefault();
+  if(p.x===lastX && p.y===lastY) return;
+  if(state.tool==="line"){
+    linePreview(p);
+    return;
+  }
+  if(state.tool==="rect" || state.tool==="ellipse"){
+    shapePreview(p);
+    return;
+  }
+  // 增量画「上次→当前」这一段，不恢复基线（恢复会擦掉已画的轨迹）
+  brushLine(lastX,lastY,p.x,p.y,strokeColor());
+  lastX = p.x; lastY = p.y;
+}
+function shapePreview(p){
+  ctx.putImageData(baseSnapshot,0,0);   // 恢复基线
+  if(state.tool==="rect") drawRectShape(lineStart.x, lineStart.y, p.x, p.y, "rgba(255,255,255,.6)", state.shapeFill);
+  else if(state.tool==="ellipse") drawEllipseShape(lineStart.x, lineStart.y, p.x, p.y, "rgba(255,255,255,.6)", state.shapeFill);
+}
+function linePreview(p){
+  ctx.putImageData(baseSnapshot,0,0);   // 恢复基线
+  paintLine(lineStart.x, lineStart.y, p.x, p.y, "rgba(255,255,255,.6)");
+}
+function onUp(e){
+  if(!drawing) return;
+  e.preventDefault();
+  drawing = false;
+  // 选区移动提交
+  if(state.tool==="select" && selDragMode==="move" && state.selPending){
+    ctx.putImageData(selMoveBase,0,0);        // 恢复 lift 前
+    ctx.putImageData(state.selPending, state.selRect.x0, state.selRect.y0);  // 贴到最终位置
+    selMoveBase = null;
+    state.selPending = null;
+    selDragMode = null;
+    renderSelectLayer();
+    syncFrameFromCanvas();
+    updateFrameThumbs();
+    renderOnion();
+    return;
+  }
+  // 选区新建完成（只是画框，不落笔）
+  if(state.tool==="select" && selDragMode==="new"){
+    selDragMode = null;
+    renderSelectLayer();
+    return;
+  }
+  if(state.tool==="line" && lineStart){
+    const p = canvasPos(e);
+    // 恢复基线（预览帧可能残留半透明预览线）
+    ctx.putImageData(baseSnapshot,0,0);
+    paintLine(lineStart.x, lineStart.y, p.x, p.y, strokeColor());
+    lineStart = null;
+    baseSnapshot = null;
+  }
+  if((state.tool==="rect" || state.tool==="ellipse") && lineStart){
+    const p = canvasPos(e);
+    // 恢复基线再画最终形状（实色）
+    ctx.putImageData(baseSnapshot,0,0);
+    if(state.tool==="rect") drawRectShape(lineStart.x, lineStart.y, p.x, p.y, strokeColor(), state.shapeFill);
+    else drawEllipseShape(lineStart.x, lineStart.y, p.x, p.y, strokeColor(), state.shapeFill);
+    lineStart = null;
+    baseSnapshot = null;
+  }
+  syncFrameFromCanvas();
+  updateFrameThumbs();
+  renderOnion();
+}
+
+function bindCanvasEvents(){
+  const cv = $("gridCanvas");
+  cv.addEventListener("mousedown", onDown);
+  cv.addEventListener("mousemove", onMove);
+  cv.addEventListener("mouseup", onUp);
+  // 鼠标拖出画布外松开也能结束绘制（window 兜底；必须带有效坐标，否则 canvasPos 得 NaN 会死循环）
+  window.addEventListener("mouseup", function(e){
+    if(!drawing) return;
+    if(typeof e.clientX !== "number" || isNaN(e.clientX)) return;
+    onUp(e);
+  });
+  cv.addEventListener("touchstart", function(e){ if(e.touches.length===1) onDown(e); }, {passive:false});
+  cv.addEventListener("touchmove", function(e){ if(e.touches.length===1) onMove(e); }, {passive:false});
+  cv.addEventListener("touchend", function(e){ onUp(e); }, {passive:false});
+  cv.addEventListener("contextmenu", function(e){ e.preventDefault(); });
+  cv.addEventListener("mousemove", function(e){
+    $("cursorPos").textContent = canvasPos(e) ? (canvasPos(e).x + "," + canvasPos(e).y) : "—";
+  });
+  cv.addEventListener("mouseleave", function(){ $("cursorPos").textContent = "—"; });
+}
+/* ============ 导入图片 → 像素画 ============ */
+function handleImageFile(file){
+  if(!file || !file.type.match(/^image\//)) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const img = new Image();
+    img.onload = function(){
+      state.pendingImage = img;
+      $("importModal").classList.remove("hidden");
+    };
+    img.onerror = function(){ alert("图片读取失败，请换一张试试"); };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function hexToRgbArr(h){
+  h = h.replace("#","");
+  if(h.length===3) h = h.split("").map(c=>c+c).join("");
+  return [parseInt(h.substr(0,2),16), parseInt(h.substr(2,2),16), parseInt(h.substr(4,2),16)];
+}
+function colorDist(a,b){
+  const dr=a[0]-b[0], dg=a[1]-b[1], db=a[2]-b[2];
+  return dr*dr+dg*dg+db*db;
+}
+function applyImport(){
+  const img = state.pendingImage;
+  if(!img) return;
+  const usePalette = $("importUsePalette").checked;
+  const colorCount = parseInt($("importColorCount").value,10);
+
+  // 降采样：目标尺寸取画布尺寸，等比 cover
+  const scale = Math.max(state.w / img.width, state.h / img.height);
+  const dw = Math.round(img.width * scale), dh = Math.round(img.height * scale);
+  const dx = Math.floor((state.w - dw)/2), dy = Math.floor((state.h - dh)/2);
+
+  const tmp = document.createElement("canvas");
+  tmp.width = state.w; tmp.height = state.h;
+  const tc = tmp.getContext("2d");
+  tc.imageSmoothingEnabled = false;
+  tc.drawImage(img, dx, dy, dw, dh);
+  const src = tc.getImageData(0,0,state.w,state.h);
+  const d = src.data;
+
+  // 取样颜色
+  let colors = [];
+  for(let i=0;i<d.length;i+=4){
+    if(d[i+3]===0) continue;
+    colors.push([d[i],d[i+1],d[i+2]]);
+  }
+  if(!colors.length){ alert("图片是透明的，没有可转换的颜色"); return; }
+
+  let finalColors;
+  if(usePalette){
+    // 映射到当前调色板：每个原始颜色找最近色板色
+    const pal = currentPalette();
+    finalColors = colors.map(c => {
+      let best = pal[0], bd = Infinity;
+      for(const pc of pal){
+        const dd = colorDist(c, pc);
+        if(dd < bd){ bd = dd; best = pc; }
+      }
+      return best;
+    });
+  } else {
+    // 中位切分量化（简单版：先把颜色去重后聚类到 colorCount 个）
+    finalColors = kmeansQuantize(colors, colorCount);
+  }
+
+  // 把量化结果写回
+  const out = ctx.createImageData(state.w, state.h);
+  for(let i=0;i<d.length;i+=4){
+    if(d[i+3]===0){ out.data[i+3]=0; continue; }
+    const idx = Math.floor(i/4);
+    const c = finalColors[idx];
+    if(c){ out.data[i]=c[0]; out.data[i+1]=c[1]; out.data[i+2]=c[2]; out.data[i+3]=255; }
+  }
+  pushHistory();
+  ctx.putImageData(out,0,0);
+  currentFrame().data.set(out.data);   // 同步回帧数据
+  updateFrameThumbs();
+  closeImportModal();
+}
+function kmeansQuantize(colors, k){
+  // 简单 K-means 聚类（颜色空间）
+  if(colors.length <= k) return colors.slice();
+  // 初始中心：均匀采样
+  let centers = [];
+  const step = Math.floor(colors.length / k);
+  for(let i=0;i<k;i++) centers.push(colors[Math.min(i*step, colors.length-1)].slice());
+  for(let iter=0; iter<6; iter++){
+    const buckets = Array.from({length:k}, ()=>[]);
+    for(const c of colors){
+      let bi = 0, bd = Infinity;
+      for(let i=0;i<k;i++){
+        const dd = colorDist(c, centers[i]);
+        if(dd<bd){ bd=dd; bi=i; }
+      }
+      buckets[bi].push(c);
+    }
+    let moved = false;
+    for(let i=0;i<k;i++){
+      if(!buckets[i].length) continue;
+      const avg = [0,0,0];
+      for(const c of buckets[i]){ avg[0]+=c[0]; avg[1]+=c[1]; avg[2]+=c[2]; }
+      avg[0]=Math.round(avg[0]/buckets[i].length);
+      avg[1]=Math.round(avg[1]/buckets[i].length);
+      avg[2]=Math.round(avg[2]/buckets[i].length);
+      if(colorDist(avg, centers[i])>0){ centers[i]=avg; moved=true; }
+    }
+    if(!moved) break;
+  }
+  // 把每个颜色映射到最近中心
+  return colors.map(c => {
+    let bi = 0, bd = Infinity;
+    for(let i=0;i<k;i++){
+      const dd = colorDist(c, centers[i]);
+      if(dd<bd){ bd=dd; bi=i; }
+    }
+    return centers[bi].slice();
+  });
+}
+function closeImportModal(){
+  $("importModal").classList.add("hidden");
+  state.pendingImage = null;
+}
+function closeExportModal(){ $("exportModal").classList.add("hidden"); }
+/* ============ 导出 PNG ============ */
+function exportPNG(){
+  const scale = parseInt($("exportScale").value,10);
+  const out = document.createElement("canvas");
+  out.width = state.w * scale; out.height = state.h * scale;
+  const oc = out.getContext("2d");
+  oc.imageSmoothingEnabled = false;
+  oc.drawImage(canvas, 0,0, state.w, state.h, 0,0, out.width, out.height);
+  const a = document.createElement("a");
+  a.download = "pixel-art-" + state.w + "x" + state.h + ".png";
+  a.href = out.toDataURL("image/png");
+  a.click();
+}
+
+/* ============ 导出 GIF（Phase 2 动画） ============ */
+function exportGIF(){
+  if(!state.frames || state.frames.length < 1) return;
+  syncFrameFromCanvas();
+  const scale = parseInt($("exportGifScale").value,10) || 1;
+  const delay = Math.max(2, Math.round((parseInt($("exportGifDelay").value,10) || 120) / 10));  // 百分之一秒
+  const W = state.w * scale, H = state.h * scale;
+  // 把所有帧采样汇总 -> 全局调色板（≤256 色）
+  const allRgba = [];
+  state.frames.forEach(function(fr){
+    const tmp = document.createElement("canvas");
+    tmp.width = W; tmp.height = H;
+    const tc = tmp.getContext("2d");
+    tc.imageSmoothingEnabled = false;
+    const srcC = document.createElement("canvas");
+    srcC.width = state.w; srcC.height = state.h;
+    srcC.getContext("2d").putImageData(fr, 0, 0);
+    tc.drawImage(srcC, 0,0, state.w, state.h, 0,0, W, H);
+    allRgba.push(tc.getImageData(0,0,W,H).data);
+  });
+  // 合并所有帧 RGBA 做一次量化（保证跨帧调色板一致）
+  const merged = new Uint8Array(W*H*4*state.frames.length);
+  allRgba.forEach(function(d, i){ merged.set(d, i*W*H*4); });
+  const pal = window.quantize(merged, 256);
+  // omggif 要求调色板长度是 2 的幂 2..256
+  let gpal = pal.map(c => (c[0]<<16)|(c[1]<<8)|c[2]);
+  let np = gpal.length;
+  if(np < 2) np = 2;
+  if(np & (np-1)){ np = 1; while(np < gpal.length) np <<= 1; }
+  while(gpal.length < np) gpal.push(0);
+  // 分配足够缓冲（估算：W*H + 头尾 + 帧数开销）
+  const buf = new Uint8Array(W*H*4 + 1024 + state.frames.length*512);
+  const gif = new window.GifWriter(buf, W, H, { palette: gpal, loop: state.loopPlay ? 0 : null });
+  // 每帧索引化并写入
+  state.frames.forEach(function(fr, i){
+    const rgba = allRgba[i];
+    const idx = window.applyPalette(rgba, gpal.map(function(v){ return [(v>>16)&255, (v>>8)&255, v&255]; }));
+    gif.addFrame(0, 0, W, H, Array.from(idx), { delay: delay });
+  });
+  const end = gif.end();
+  const bytes = buf.subarray(0, end);
+  let binary = "";
+  for(let i=0;i<bytes.length;i++) binary += String.fromCharCode(bytes[i]);
+  const b64 = btoa(binary);
+  const a = document.createElement("a");
+  a.download = "pixel-anim-" + state.w + "x" + state.h + ".gif";
+  a.href = "data:image/gif;base64," + b64;
+  a.click();
+}
+
+/* ============ 导出 Sprite sheet（Phase 3 P2） ============ */
+function openSpriteModal(){
+  syncFrameFromCanvas();
+  $("spriteFrameCount").textContent = state.frames.length;
+  $("spriteModal").classList.remove("hidden");
+  renderSpritePreview();
+}
+function renderSpritePreview(){
+  const n = state.frames.length;
+  const base = renderSpriteCanvas(n, true); // 1x 预览（不放大，预览 canvas 用 CSS 控制大小）
+  const pv = $("spritePreview");
+  pv.width = base.width; pv.height = base.height;
+  pv.getContext("2d").drawImage(base, 0, 0);
+}
+function renderSpriteCanvas(forceCols, forPreview){
+  // 计算列数
+  const n = state.frames.length;
+  let cols = parseInt($("spriteColumns").value,10);
+  if(!cols || cols < 1) cols = Math.ceil(Math.sqrt(n));
+  cols = Math.max(1, Math.min(cols, n));
+  const rows = Math.ceil(n / cols);
+  const scale = parseInt($("spriteScale").value,10) || 1;
+  const gap = parseInt($("spriteGap").value,10) || 0;
+  const bg = $("spriteBg").value;
+  const cellW = state.w * scale, cellH = state.h * scale;
+  const W = cols * cellW + (cols-1)*gap;
+  const H = rows * cellH + (rows-1)*gap;
+  // 预览固定 1x，不放大
+  const effScale = forPreview ? 1 : scale;
+  const effCellW = state.w * effScale, effCellH = state.h * effScale;
+  const effGap = forPreview ? Math.min(gap, 4) : gap;
+  const effW = cols * effCellW + (cols-1)*effGap;
+  const effH = rows * effCellH + (rows-1)*effGap;
+  const out = document.createElement("canvas");
+  out.width = effW; out.height = effH;
+  const oc = out.getContext("2d");
+  oc.imageSmoothingEnabled = false;
+  if(bg === "black"){ oc.fillStyle = "#000"; oc.fillRect(0,0,effW,effH); }
+  else if(bg === "white"){ oc.fillStyle = "#fff"; oc.fillRect(0,0,effW,effH); }
+  // transparent / checker 都保持透明背景（checker 只用于预览的 CSS 底）
+  state.frames.forEach(function(fr, i){
+    const col = i % cols, row = Math.floor(i / cols);
+    const dx = col * (effCellW + effGap), dy = row * (effCellH + effGap);
+    // 帧 ImageData -> 临时 canvas -> 近邻放大绘制
+    const tmp = document.createElement("canvas");
+    tmp.width = state.w; tmp.height = state.h;
+    tmp.getContext("2d").putImageData(fr, 0, 0);
+    oc.drawImage(tmp, 0,0, state.w, state.h, dx, dy, effCellW, effCellH);
+  });
+  $("spriteSizeInfo").textContent = "输出尺寸：" + effW + " × " + effH + " px · 网格 " + cols + " 列 × " + rows + " 行";
+  return out;
+}
+function exportSprite(){
+  const canvas = renderSpriteCanvas(parseInt($("spriteColumns").value,10), false);
+  const a = document.createElement("a");
+  a.download = "pixel-spritesheet-" + state.w + "x" + state.h + ".png";
+  a.href = canvas.toDataURL("image/png");
+  a.click();
+}
+
+/* ============ 导出字符画（Phase 3 P2） ============ */
+function openAsciiModal(){
+  syncFrameFromCanvas();
+  $("asciiModal").classList.remove("hidden");
+  renderAsciiPreview();
+}
+function renderAsciiPreview(){
+  const text = buildAscii();
+  const pv = $("asciiPreview");
+  pv.textContent = text;
+  pv.style.color = $("asciiFg").value;
+  pv.style.backgroundColor = $("asciiBg").value;
+}
+const ASCII_CHARSETS = {
+  classic: ["#","@","%","*","+","=","-",":","."],
+  block  : ["█","▓","▒","░"],
+  binary : ["1","0"],
+  shade  : ["@","%","#","*","+","=","-",":","."]
+};
+function buildAscii(){
+  // 使用当前帧（用户预览哪个帧就导哪个帧）
+  const fr = currentFrame();
+  if(!fr) return "";
+  const data = fr.data;
+  const charset = ASCII_CHARSETS[$("asciiCharset").value] || ASCII_CHARSETS.classic;
+  const scale = parseInt($("asciiScale").value,10) || 1;
+  const lines = [];
+  const stepX = scale, stepY = scale;
+  for(let y=0; y<state.h; y+=stepY){
+    let line = "";
+    for(let x=0; x<state.w; x+=stepX){
+      // 采样块亮度（取块内有内容像素的平均亮度，透明像素忽略 → 空格）
+      let sum = 0, opaque = 0;
+      for(let j=0; j<stepY && y+j<state.h; j++){
+        for(let i=0; i<stepX && x+i<state.w; i++){
+          const idx = ((y+j)*state.w + (x+i)) * 4;
+          const a = data[idx+3];
+          if(a === 0) continue;
+          sum += (0.299*data[idx] + 0.587*data[idx+1] + 0.114*data[idx+2]) * (a/255);
+          opaque += a/255;
+        }
+      }
+      if(opaque === 0){ line += " "; continue; }
+      const lum = sum / opaque;             // 0~255
+      // 亮度 -> 字符索引：越亮用越靠前的字符（高密度）
+      const idx = Math.floor((255 - lum) / 256 * charset.length);
+      line += charset[Math.max(0, Math.min(charset.length-1, idx))];
+    }
+    // 去掉行尾空白（保持文本整洁）
+    line = line.replace(/\s+$/, "");
+    if(line.length > 0) lines.push(line);
+  }
+  return lines.join("\n") + "\n";
+}
+function copyAscii(){
+  const text = buildAscii();
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(function(){
+      $("cursorPos").textContent = "已复制字符画";
+    });
+  } else {
+    // fallback：老浏览器用 textarea 选中复制
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    try{ document.execCommand("copy"); $("cursorPos").textContent = "已复制字符画"; }catch(e){}
+    document.body.removeChild(ta);
+  }
+}
+function downloadAscii(){
+  const text = buildAscii();
+  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+  const a = document.createElement("a");
+  a.download = "pixel-art-" + state.w + "x" + state.h + ".txt";
+  a.href = URL.createObjectURL(blob);
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 2000);
+}
+/* 播放预览 */
+let playTimer = null;
+function togglePlay(){
+  if(state.playing){
+    stopPlay();
+    return;
+  }
+  if(state.frames.length < 2) return;
+  state.playing = true;
+  $("btnPlay").textContent = "⏸";
+  const tick = function(){
+    syncFrameFromCanvas();
+    state.frameIdx = (state.frameIdx + 1) % state.frames.length;
+    syncCanvasFromFrame();
+    updateFrameBar();
+    renderOnion();
+    playTimer = setTimeout(tick, 150);
+  };
+  playTimer = setTimeout(tick, 150);
+}
+function stopPlay(){
+  state.playing = false;
+  if(playTimer){ clearTimeout(playTimer); playTimer = null; }
+  $("btnPlay").textContent = "▶";
+  renderOnion();
+}
+
+/* ============ 自动保存草稿（localStorage） ============ */
+const DRAFT_KEY = "pixelstudio_draft_v2";
+function saveDraft(){
+  try{
+    syncFrameFromCanvas();
+    const framesData = state.frames.map(function(fr){
+      // ImageData 转 PNG dataURL（压缩体积）
+      const tmp = document.createElement("canvas");
+      tmp.width = state.w; tmp.height = state.h;
+      tmp.getContext("2d").putImageData(fr,0,0);
+      return tmp.toDataURL("image/png");
+    });
+    const payload = {
+      w: state.w, h: state.h,
+      frames: framesData,
+      frameIdx: state.frameIdx,
+      paletteType: state.paletteType,
+      customPalette: state.customPalette,
+      symmetry: state.symmetry,
+      savedAt: Date.now()
+    };
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(payload));
+  }catch(e){ /* localStorage 满或禁用忽略 */ }
+}
+function loadDraft(){
+  try{
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if(!raw) return false;
+    const payload = JSON.parse(raw);
+    if(!payload || !payload.frames || !payload.frames.length) return false;
+    if(payload.w<1||payload.w>256||payload.h<1||payload.h>256) return false;
+    state.w = payload.w; state.h = payload.h;
+    // 异步解码所有帧图片，完成后写入 state.frames 并刷新界面
+    let loaded = 0;
+    const total = payload.frames.length;
+    const frames = new Array(total);
+    payload.frames.forEach(function(url, i){
+      const img = new Image();
+      img.onload = function(){
+        const tmp = document.createElement("canvas");
+        tmp.width = payload.w; tmp.height = payload.h;
+        const tc = tmp.getContext("2d");
+        tc.drawImage(img,0,0);
+        const d = tc.getImageData(0,0,payload.w,payload.h);
+        const im = ctx.createImageData(payload.w, payload.h);
+        im.data.set(d.data);
+        frames[i] = im;
+        loaded++;
+        if(loaded === total){
+          state.frames = frames;
+          state.frameIdx = payload.frameIdx < frames.length ? payload.frameIdx : 0;
+          if(payload.paletteType) state.paletteType = payload.paletteType;
+          if(payload.customPalette) state.customPalette = payload.customPalette;
+          if(payload.symmetry) state.symmetry = payload.symmetry;
+          canvas.width = state.w; canvas.height = state.h;
+          syncCanvasFromFrame();
+          updateStageSize();
+          updateFrameBar();
+          renderPalette();
+          updateHUD();
+          renderOnion();
+        }
+      };
+      img.onerror = function(){
+        loaded++;
+        frames[i] = newFrameData();
+        if(loaded === total){
+          state.frames = frames;
+          state.frameIdx = 0;
+          canvas.width = state.w; canvas.height = state.h;
+          syncCanvasFromFrame();
+          updateStageSize(); updateFrameBar(); renderPalette(); updateHUD();
+        }
+      };
+      img.src = url;
+    });
+    return true;
+  }catch(e){ return false; }
+}
+function restoreDraft(){
+  // init 时调用：有草稿则异步恢复（loadDraft 内部完成初始化），否则返回 false 让 init 建空帧
+  return loadDraft();
+}
+
+/* ============ 参考层（Phase 3 P1） ============ */
+function renderRefLayer(){
+  const layer = $("refLayer");
+  if(!state.refOn || !state.refVisible){
+    layer.style.display = "none";
+    return;
+  }
+  const img = state.refImage;
+  if(!img) return;
+  layer.style.display = "block";
+  layer.style.opacity = state.refOpacity;
+  layer.style.backgroundImage = "url(" + img.src + ")";
+  // 缩放：参考图在画布内等比缩放（含 scale 倍率）；100% = 原图等比铺满画布
+  const scale = state.refScale;
+  const cw = state.w * cell, ch = state.h * cell;
+  const fit = Math.min(cw / img.naturalWidth, ch / img.naturalHeight);
+  const w = Math.round(img.naturalWidth * fit * scale);
+  const h = Math.round(img.naturalHeight * fit * scale);
+  layer.style.backgroundSize = w + "px " + h + "px";
+}
+function loadRefImage(file){
+  if(!file || !file.type.match(/^image\//)) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const img = new Image();
+    img.onload = function(){
+      state.refOn = true;
+      state.refVisible = true;
+      state.refImage = img;
+      $("refToggle").checked = true;
+      $("refStatus").textContent = "已导入：" + (img.naturalWidth) + "×" + (img.naturalHeight) + "px";
+      renderRefLayer();
+    };
+    img.onerror = function(){ alert("参考图读取失败，请换一张试试"); };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function removeRefLayer(){
+  state.refOn = false;
+  state.refImage = null;
+  $("refToggle").checked = false;
+  $("refStatus").textContent = "未导入 — 导入图片垫底临摹";
+  renderRefLayer();
+}
+
+/* ============ 调色板 UI ============ */
+function currentPalette(){
+  if(state.paletteType === "custom") return state.customPalette.slice();
+  return PALETTES[state.paletteType];
+}
+function renderPalette(){
+  const grid = $("paletteGrid");
+  grid.innerHTML = "";
+  const pal = currentPalette();
+  // 32 色用 8 列，其余 4 列（避免右栏过长）
+  grid.style.gridTemplateColumns = pal.length > 20 ? "repeat(8,1fr)" : "repeat(4,1fr)";
+  pal.forEach(function(c, i){
+    const sw = document.createElement("button");
+    sw.className = "swatch" + (i===state.selectedSwatch ? " sel" : "");
+    sw.style.background = c;
+    sw.dataset.idx = i;
+    sw.title = c;
+    sw.addEventListener("click", function(){
+      state.curColor = c;
+      state.selectedSwatch = i;
+      $("colorPicker").value = c;
+      $("colorHex").textContent = c;
+      renderPalette();
+    });
+    grid.appendChild(sw);
+  });
+  // 添加按钮
+  const add = document.createElement("button");
+  add.className = "swatch add";
+  add.textContent = "+";
+  add.title = "把当前颜色加入调色板";
+  add.addEventListener("click", function(){
+    const c = state.curColor;
+    if(state.paletteType==="custom"){
+      if(!state.customPalette.includes(c)) state.customPalette.push(c);
+    } else {
+      state.customPalette = currentPalette().concat([c]);
+      state.paletteType = "custom";
+      $("paletteSelect").value = "custom";
+    }
+    state.selectedSwatch = state.customPalette.length-1;
+    renderPalette();
+  });
+  grid.appendChild(add);
+  // 当为 custom 时显示删除按钮
+  $("btnDelColor").style.display = state.paletteType==="custom" ? "" : "none";
+}
+
+/* ============ UI 绑定 ============ */
+function bindUI(){
+  // 工具切换
+  document.querySelectorAll("[data-tool]").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      state.tool = btn.dataset.tool;
+      document.querySelectorAll("[data-tool]").forEach(function(b){ b.classList.remove("active"); });
+      btn.classList.add("active");
+      // 面板显隐
+      $("shapeGroup").style.display = (state.tool==="rect" || state.tool==="ellipse") ? "" : "none";
+      $("selectGroup").style.display = (state.tool==="select") ? "" : "none";
+      if(state.tool!=="select"){ renderSelectLayer(); }
+    });
+  });
+  // 笔刷
+  $("brushSize").addEventListener("input", function(){
+    state.brush = parseInt(this.value,10);
+    $("brushSizeVal").textContent = state.brush;
+  });
+  $("brushShape").addEventListener("change", function(){
+    state.brushShape = this.value;
+  });
+  // 网格
+  $("gridToggle").addEventListener("change", function(){
+    state.gridOn = this.checked;
+    updateStageSize();
+  });
+  // 尺寸预设
+  $("sizePreset").addEventListener("change", function(){
+    const v = this.value;
+    if(v === "custom"){
+      const w = prompt("画布宽度（1-256）：","32");
+      const h = prompt("画布高度（1-256）：","32");
+      const nw = parseInt(w,10), nh = parseInt(h,10);
+      if(nw>=1 && nw<=256 && nh>=1 && nh<=256){
+        resizeCanvas(nw,nh);
+        pushHistory();
+      } else {
+        this.value = "64";
+      }
+    } else {
+      const n = parseInt(v,10);
+      resizeCanvas(n,n);
+      pushHistory();
+    }
+  });
+  // 调色板选择
+  $("paletteSelect").addEventListener("change", function(){
+    state.paletteType = this.value;
+    state.selectedSwatch = -1;
+    renderPalette();
+  });
+  // 当前颜色
+  $("colorPicker").addEventListener("input", function(){
+    state.curColor = this.value;
+    $("colorHex").textContent = this.value;
+  });
+  // 删除调色板色
+  $("btnDelColor").addEventListener("click", function(){
+    if(state.paletteType!=="custom" || state.selectedSwatch<0) return;
+    state.customPalette.splice(state.selectedSwatch,1);
+    if(state.selectedSwatch >= state.customPalette.length) state.selectedSwatch = state.customPalette.length-1;
+    renderPalette();
+  });
+  // 撤销/重做
+  $("btnUndo").addEventListener("click", undo);
+  $("btnRedo").addEventListener("click", redo);
+  // 教程
+  $("btnOpenTutorial").addEventListener("click", openTutorial);
+  $("btnCloseTutorial").addEventListener("click", function(){ $("tutorialModal").classList.add("hidden"); });
+  $("btnCloseTutorial2").addEventListener("click", function(){ $("tutorialModal").classList.add("hidden"); });
+  // 导入
+  $("btnImport").addEventListener("click", function(){ $("fileInput").click(); });
+  $("fileInput").addEventListener("change", function(){
+    if(this.files && this.files[0]) handleImageFile(this.files[0]);
+    this.value = "";
+  });
+  // 参考层
+  $("btnRefImport").addEventListener("click", function(){ $("refFileInput").click(); });
+  $("refFileInput").addEventListener("change", function(){
+    if(this.files && this.files[0]) loadRefImage(this.files[0]);
+    this.value = "";
+  });
+  $("refToggle").addEventListener("change", function(){
+    state.refVisible = this.checked;
+    renderRefLayer();
+  });
+  $("refOpacity").addEventListener("input", function(){
+    state.refOpacity = parseInt(this.value,10)/100;
+    $("refOpacityVal").textContent = this.value + "%";
+    renderRefLayer();
+  });
+  $("refScale").addEventListener("input", function(){
+    state.refScale = parseInt(this.value,10)/100;
+    $("refScaleVal").textContent = this.value + "%";
+    renderRefLayer();
+  });
+  $("btnRefRemove").addEventListener("click", removeRefLayer);
+  $("btnCloseImport").addEventListener("click", closeImportModal);
+  $("btnApplyImport").addEventListener("click", applyImport);
+  $("importUsePalette").addEventListener("change", function(){
+    $("importColorCountRow").style.display = this.checked ? "none" : "";
+  });
+  $("importColorCountRow").style.display = "none";
+  // 导出
+  $("btnExport").addEventListener("click", function(){
+    const scale = parseInt($("exportScale").value,10);
+    $("exportSizeInfo").textContent = "输出尺寸：" + (state.w*scale) + " × " + (state.h*scale) + " px";
+    $("exportModal").classList.remove("hidden");
+  });
+  $("btnCloseExport").addEventListener("click", closeExportModal);
+  $("btnDoExport").addEventListener("click", function(){
+    exportPNG();
+    closeExportModal();
+  });
+  // GIF 导出
+  $("btnExportGIF").addEventListener("click", function(){
+    syncFrameFromCanvas();
+    $("gifFrameCount").textContent = state.frames.length;
+    $("gifModal").classList.remove("hidden");
+  });
+  $("btnCloseGifExport").addEventListener("click", function(){ $("gifModal").classList.add("hidden"); });
+  $("btnDoGifExport").addEventListener("click", function(){
+    exportGIF();
+    $("gifModal").classList.add("hidden");
+  });
+  // Sprite sheet 导出
+  $("btnExportSprite").addEventListener("click", openSpriteModal);
+  $("btnCloseSprite").addEventListener("click", function(){ $("spriteModal").classList.add("hidden"); });
+  $("spriteColumns").addEventListener("change", renderSpritePreview);
+  $("spriteScale").addEventListener("change", renderSpritePreview);
+  $("spriteGap").addEventListener("change", renderSpritePreview);
+  $("spriteBg").addEventListener("change", renderSpritePreview);
+  $("btnDoSprite").addEventListener("click", function(){
+    exportSprite();
+    $("spriteModal").classList.add("hidden");
+  });
+  // 字符画导出
+  $("btnExportAscii").addEventListener("click", openAsciiModal);
+  $("asciiCharset").addEventListener("change", renderAsciiPreview);
+  $("asciiScale").addEventListener("change", renderAsciiPreview);
+  $("asciiFg").addEventListener("input", renderAsciiPreview);
+  $("asciiBg").addEventListener("input", renderAsciiPreview);
+  $("btnAsciiCopy").addEventListener("click", copyAscii);
+  $("btnAsciiDownload").addEventListener("click", downloadAscii);
+  $("btnCloseAscii").addEventListener("click", function(){ $("asciiModal").classList.add("hidden"); });
+  // 帧管理
+  $("btnAddFrame").addEventListener("click", addFrame);
+  $("btnDupFrame").addEventListener("click", dupFrame);
+  $("btnDelFrame").addEventListener("click", delFrame);
+  $("btnPlay").addEventListener("click", togglePlay);
+  // 洋葱皮
+  $("onionToggle").addEventListener("change", function(){
+    state.onionOn = this.checked;
+    renderOnion();
+  });
+  $("onionOpacity").addEventListener("input", function(){
+    state.onionOpacity = parseInt(this.value,10)/100;
+    renderOnion();
+  });
+  $("loopToggle").addEventListener("change", function(){
+    state.loopPlay = this.checked;
+  });
+  // 对称
+  $("symmetrySelect").addEventListener("change", function(){
+    state.symmetry = this.value;
+  });
+  // 形状填充
+  $("shapeFill").addEventListener("change", function(){
+    state.shapeFill = this.checked;
+  });
+  // 选区操作按钮
+  $("btnSelFlipH").addEventListener("click", function(){
+    if(!state.selRect){ alert("先框选一块区域"); return; }
+    pushHistory();
+    transformSelection("flipH");
+    syncFrameFromCanvas();
+    updateFrameThumbs();
+    renderOnion();
+  });
+  $("btnSelFlipV").addEventListener("click", function(){
+    if(!state.selRect){ alert("先框选一块区域"); return; }
+    pushHistory();
+    transformSelection("flipV");
+    syncFrameFromCanvas();
+    updateFrameThumbs();
+    renderOnion();
+  });
+  $("btnSelRotate").addEventListener("click", function(){
+    if(!state.selRect){ alert("先框选一块区域"); return; }
+    pushHistory();
+    transformSelection("rotate");
+    syncFrameFromCanvas();
+    updateFrameThumbs();
+    renderOnion();
+  });
+  $("btnSelCopy").addEventListener("click", function(){
+    if(copySelection()){ $("cursorPos").textContent = "已复制选区"; }
+    else alert("先框选一块区域");
+  });
+  $("btnSelPaste").addEventListener("click", function(){
+    if(state.selClip) enterPaste();
+    else alert("剪贴板为空，先复制选区 (Ctrl+C)");
+  });
+  $("btnSelClear").addEventListener("click", clearSelection);
+  // 自动保存：关键操作后防抖保存
+  let saveTimer = null;
+  function scheduleSave(){
+    if(saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveDraft, 500);
+  }
+  window.addEventListener("beforeunload", saveDraft);
+  // 每次推历史 = 一次操作完成，触发保存
+  const origPushHistory = pushHistory;
+  pushHistory = function(){
+    origPushHistory();
+    scheduleSave();
+  };
+  // 播放状态也保存帧变更（播放只是切换帧，不影响数据，但切换帧后要保存 frameIdx）
+  const origSwitchFrame = switchFrame;
+  switchFrame = function(idx){
+    origSwitchFrame(idx);
+    scheduleSave();
+  };
+  // 全局键盘
+  window.addEventListener("keydown", function(e){
+    if((e.ctrlKey || e.metaKey) && e.key.toLowerCase()==="z"){
+      e.preventDefault();
+      if(e.shiftKey) redo(); else undo();
+    } else if((e.ctrlKey || e.metaKey) && e.key.toLowerCase()==="y"){
+      e.preventDefault(); redo();
+    } else if((e.ctrlKey || e.metaKey) && e.key.toLowerCase()==="c"){
+      if(state.tool==="select"){ e.preventDefault(); copySelection(); }
+    } else if((e.ctrlKey || e.metaKey) && e.key.toLowerCase()==="v"){
+      if(state.tool==="select" && state.selClip){ e.preventDefault(); enterPaste(); }
+    } else if(e.key==="Escape"){
+      if(state.tool==="select"){ e.preventDefault(); clearSelection(); }
+    } else if(e.key==="F1"){
+      e.preventDefault(); openTutorial();
+    }
+  });
+}
+function openTutorial(){
+  drawDemoHeart();
+  drawDemoDither();
+  $("tutorialModal").classList.remove("hidden");
+}
+function drawDemoHeart(){
+  const cv = $("demoHeart");
+  if(!cv) return;
+  cv.width = 16; cv.height = 16;
+  const c = cv.getContext("2d");
+  const H = [
+    "0000000000000000",
+    "0110000000000110",
+    "0111000000001110",
+    "1111100000011111",
+    "1111110000111111",
+    "1111111001111111",
+    "1111111111111111",
+    "1111111111111111",
+    "0111111111111110",
+    "0011111111111100",
+    "0001111111111000",
+    "0000111111110000",
+    "0000011111100000",
+    "0000001111000000",
+    "0000000110000000",
+    "0000000000000000"
+  ];
+  for(let y=0;y<16;y++) for(let x=0;x<16;x++){
+    if(H[y][x]==="1"){ c.fillStyle="#ff4d6d"; c.fillRect(x,y,1,1); }
+  }
+}
+function drawDemoDither(){
+  const cv = $("demoDither");
+  if(!cv) return;
+  cv.width = 16; cv.height = 16;
+  const c = cv.getContext("2d");
+  for(let y=0;y<16;y++) for(let x=0;x<16;x++){
+    const col = (x + y) % 2 === 0 ? "#0f0f0f" : "#f0f0f0";
+    c.fillStyle = col; c.fillRect(x,y,1,1);
+  }
+}
+
+/* ============ 初始化 ============ */
+function init(){
+  canvas = $("gridCanvas");
+  ctx = canvas.getContext("2d", { willReadFrequently: true });
+  canvas.width = state.w; canvas.height = state.h;
+  bindCanvasEvents();
+  bindUI();
+  // 恢复草稿或建首帧
+  const hasDraft = restoreDraft();
+  if(hasDraft){
+    // 有草稿：loadDraft 异步完成时自己会设 canvas/UI；现在先把尺寸 UI 设好防闪
+    updateStageSize();
+    updateFrameBar();
+    renderPalette();
+    updateHUD();
+  } else {
+    state.frames = [newFrameData()];
+    syncCanvasFromFrame();
+    resizeCanvas(state.w, state.h);
+    updateFrameBar();
+    renderPalette();
+    $("colorHex").textContent = state.curColor;
+    updateStageSize(); updateHUD();
+  }
+  // 首次加载自动打开教程（新手引导）
+  if(!localStorage.getItem("pixelstudio_tutorial_done")){
+    openTutorial();
+    localStorage.setItem("pixelstudio_tutorial_done","1");
+  }
+  // 初始面板状态
+  $("shapeGroup").style.display = "none";
+  $("selectGroup").style.display = "none";
+  renderSelectLayer();
+}
+init();
+</script>
+</body>
+</html>
