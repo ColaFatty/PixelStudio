@@ -39,7 +39,8 @@ npm run build
 
 | 版本 | 内容 |
 |------|------|
-| v3.2 | 当前最新：全部功能 + Sprite sheet / 字符画 / Tauri 壳 |
+| v3.3 | 当前最新：图片转像素算法升级（平滑降采样 + Floyd–Steinberg 抖动 + PNN 量化）|
+| v3.2 | 全部功能 + Sprite sheet / 字符画 / Tauri 壳 |
 | v3.1 | 参考层 / Sweetie-16+Endesga-32 调色板 / 笔刷增强 |
 | v3.0 | 选区 + 形状工具 |
 
