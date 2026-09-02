@@ -3145,6 +3145,7 @@ function loadSpriteTemplate(tpl){
   ctx.putImageData(d, 0, 0);
   state.frames = [d];
   state.frameIdx = 0;
+  syncCanvasFromFrame();   // 统一保护：pushHistory 前确认 canvas = frames[0]
   pushHistory();
   updateFrameBar();
   renderPalette();
@@ -3164,6 +3165,7 @@ function loadTileTemplate(tpl){
   ctx.putImageData(d, 0, 0);
   state.frames = [d];
   state.frameIdx = 0;
+  syncCanvasFromFrame();   // 统一保护：pushHistory 前确认 canvas = frames[0]
   pushHistory();
   updateFrameBar();
   renderPalette();
@@ -3190,6 +3192,7 @@ function loadWalkerTemplate(){
     }
   }
   state.frameIdx = 0;
+  syncCanvasFromFrame();   // 把 frames[0] 画到 canvas，避免随后 pushHistory 的 syncFrameFromCanvas 用空白覆盖 frames[0]
   pushHistory();
   updateFrameBar();
   renderPalette();
