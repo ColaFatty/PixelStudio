@@ -77,6 +77,8 @@ async def main():
             try { for(;;){ localStorage.setItem('px_fill_'+i++, 'y'); } } catch(e){}
             try { localStorage.setItem('px_last_bit', 'z'); } catch(e){ window.__totally_full = true; }
         }""")
+        # 记录 saveDraft 前的 DRAFT_KEY 值（用于端到端断言：爆仓后不应被更新）
+        await page.evaluate("() => { window.__draft_before = localStorage.getItem('pixelstudio_draft_v2'); }")
         filled = await page.evaluate("() => !!window.__totally_full")
         if not filled:
             # 极端情况：仍有残空间（存储配额极大）→ 直接 mock setItem 抛 QuotaExceeded，验证 catch→toast 链路
@@ -86,11 +88,16 @@ async def main():
             }""")
         await page.evaluate("() => saveDraft()")
         await page.wait_for_timeout(400)
+        # 端到端实锤（butler 建议）：catch 生效 = DRAFT_KEY 写不进去 = 值未更新
+        draft_unchanged = await page.evaluate("""() => {
+            return window.__draft_before === localStorage.getItem('pixelstudio_draft_v2');
+        }""")
         toast = await page.evaluate("""() => {
             const t = document.getElementById('pxToast');
             return t ? {exists: true, text: t.textContent, visible: t.style.opacity === '1'} : {exists: false};
         }""")
         check("P1.2 爆仓 toast 出现且可见", toast["exists"] and toast["visible"] and "保存失败" in toast["text"], str(toast))
+        check("P1.2 DRAFT_KEY 未被写入（catch 端到端实锤）", draft_unchanged)
         await page.evaluate("() => { Object.keys(localStorage).filter(k=>k.startsWith('px_fill_')).forEach(k=>localStorage.removeItem(k)); }")
 
         # ---------- P2.1 科幻素材 12 个逐个载入 ----------
